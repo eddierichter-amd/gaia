@@ -64,7 +64,7 @@ GAIA supports two modes:
       - Check via _"Device Manager -> Neural Processors -> NPU Compute Accelerator Device -> Properties -> Driver Tab"_
 
 # Setup and Installation
-1. Clone GAIA repo: `git clone https://github.com/aigdat/gaia.git`
+1. Clone GAIA repo: `git clone https://github.com/amd/gaia.git`
 1. Open a powershell prompt and go to the GAIA root: `cd ./gaia`
 1. Create and activate a conda environment:
     1. `conda create -n gaiaenv python=3.10 -y`
@@ -195,7 +195,7 @@ If the GAIA application is not detecting the correct mode:
 
 # Support
 
-Report any issues to the GAIA team at `gaia@amd.com` or create an [issue](https://github.com/aigdat/gaia/issues) on the [GAIA GitHub repo](https://github.com/aigdat/gaia.git).
+Report any issues to the GAIA team at `gaia@amd.com` or create an [issue](https://github.com/amd/gaia/issues) on the [GAIA GitHub repo](https://github.com/amd/gaia.git).
 
 # License
 
