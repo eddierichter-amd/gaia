@@ -99,12 +99,32 @@ After making changes, you need to compile the updated files:
 
 - **GAIA BETA (also referred to as RAUX for RyzenAI User Experience)** is a modern web-based interface for GAIA, built as a fork from [Open-WebUI](https://github.com/open-webui/open-webui). It provides an extensible, feature-rich, and user-friendly self-hosted AI platform. GAIA BETA is currently in beta and is being actively integrated with new features and improvements rolling out regularly. While it offers a modern web-based experience, please note that it's still under development and some features may be experimental.
 
-> **Important:** You must manually start Lemonade (the backend server) before launching GAIA BETA. GAIA BETA will not function correctly unless Lemonade is running first.
-
 ## New in GAIA BETA (RAUX)
 - Improved error handling and progress reporting via inter-process communication (IPC) between the main and renderer processes.
 - Unified GAIA BETA branding and updated messaging throughout the installer and UI.
 - For technical details on the integration, IPC, and installer, see [CLAUDE.md](../CLAUDE.md).
+
+### 🙏 **Acknowledgments: RAUX & OpenWebUI**
+
+#### **Built on OpenWebUI Foundation**
+
+RAUX (RyzenAI UX) is built upon the excellent foundation provided by **OpenWebUI**, an outstanding open-source project that has revolutionized how users interact with AI models through web interfaces.
+
+#### **Special Thanks**
+
+We extend our heartfelt gratitude to:
+
+- **[Timothy Jaeryang Baek](https://github.com/tjbck)** and the entire **OpenWebUI team** for creating and maintaining such an exceptional open-source project
+- The **OpenWebUI community** for their continuous contributions, feedback, and innovation
+- All **open-source contributors** who have helped shape the modern AI interface landscape
+
+#### **Open Source Heritage**
+
+RAUX builds upon OpenWebUI's solid architectural foundation while adding AMD-specific optimizations and integrations tailored for the GAIA ecosystem. This collaboration exemplifies the power of open-source software in advancing AI accessibility and user experience. The OpenWebUI project's commitment to creating intuitive, powerful, and extensible AI interfaces has made GAIA BETA possible. 
+
+**Learn more about OpenWebUI**: [https://github.com/open-webui/open-webui](https://github.com/open-webui/open-webui)
+
+---
 
 For more information about GAIA BETA (RAUX), including setup instructions and feature documentation, please refer to the [RAUX GitHub repository README](https://github.com/aigdat/raux/blob/main/README.md).
 
