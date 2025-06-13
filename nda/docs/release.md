@@ -80,6 +80,13 @@ The script is designed to be part of a controlled release process where changes 
 1. Run `python release.py -o <path-to-gaia-public>`
     1. For example: `python release.py -o ..\gaia_public\gaia`
 1. Once all tests pass, complete the PR into the main branch.
+1. Create a tag in the `main` branch that matches the version above and push it to origin.
+    ```bash
+    git checkout main
+    git pull
+    git tag v0.7.4
+    git push --tags
+    ```
 1. Create a GitHub release in the public repository:
     1. Go to the [gaia-public](https://github.com/amd/gaia) repository on GitHub
     1. Click on "Releases" in the right sidebar
