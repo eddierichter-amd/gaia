@@ -64,35 +64,6 @@ OutFile "gaia-windows-setup.exe"
 ; Define the GAIA_STRING variable
 Var GAIA_STRING
 
-; Variables for CPU detection
-Var cpuName
-Var isCpuSupported
-Var ryzenAiPos
-Var seriesStartPos
-Var currentChar
-Var Dialog
-Var Label
-
-
-
-; Warning message for incompatible processors
-Function WarningPage
-  ${If} $isCpuSupported != "true"
-    !insertmacro MUI_HEADER_TEXT "Hardware Compatibility Warning" "Your processor does not support GAIA"
-    nsDialogs::Create 1018
-    Pop $Dialog
-
-    ; Create warning message with detected processor and contact info
-    ${NSD_CreateLabel} 0 0 100% 140u "Detected Processor:$\n$cpuName$\nGAIA is currently only supported on AMD Ryzen AI 300-series processors.$\n$\nPlease cancel the installation and upgrade to a Ryzen AI 300-series processor to use GAIA.$\n$\nFor more information, contact us at gaia@amd.com"
-    Pop $Label
-    SetCtlColors $Label "" "transparent"
-
-    nsDialogs::Show
-  ${EndIf}
-FunctionEnd
-
-
-
 ; Variable to track whether to install RAUX
 Var InstallRAUX
 
@@ -104,47 +75,6 @@ Var RunRAUXCheckbox
 Function .onInit
   ; Set GAIA string
   StrCpy $GAIA_STRING "GAIA ${GAIA_VERSION}"
-
-  ; Check CPU name to determine compatibility
-  DetailPrint "Checking CPU model..."
-
-  ; Use registry query to get CPU name
-  nsExec::ExecToStack 'reg query "HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\CentralProcessor\0" /v ProcessorNameString'
-  Pop $0 ; Return value
-  Pop $cpuName ; Output (CPU name)
-  DetailPrint "Detected CPU: $cpuName"
-
-  ; Check if CPU name contains "Ryzen AI" and a 3-digit number starting with 3
-  StrCpy $isCpuSupported "false" ; Initialize CPU allowed flag to false
-
-  ${StrLoc} $ryzenAiPos $cpuName "Ryzen AI" ">"
-  ${If} $ryzenAiPos != ""
-    ; Found "Ryzen AI", now look for 3xx series
-    ${StrLoc} $seriesStartPos $cpuName " 3" ">"
-    ${If} $seriesStartPos != ""
-      ; Check if the character after "3" is a digit (first digit of model number)
-      StrCpy $currentChar $cpuName 1 $seriesStartPos+2
-      ${If} $currentChar >= "0"
-        ${AndIf} $currentChar <= "9"
-        ; Check if the character after that is also a digit (second digit of model number)
-        StrCpy $currentChar $cpuName 1 $seriesStartPos+3
-        ${If} $currentChar >= "0"
-          ${AndIf} $currentChar <= "9"
-          ; Found a complete 3-digit number starting with 3
-          StrCpy $isCpuSupported "true"
-          DetailPrint "Detected Ryzen AI 3xx series processor"
-        ${EndIf}
-      ${EndIf}
-    ${EndIf}
-  ${EndIf}
-
-  DetailPrint "CPU is compatible with Ryzen AI NPU/Hybrid software: $isCpuSupported"
-
-  ; If CPU is not compatible, show warning - user will need to cancel installation
-  ${If} $isCpuSupported != "true"
-    ; Make a note in the detail log
-    DetailPrint "CPU not compatible with GAIA - installation requires Ryzen AI 300-series processor"
-  ${EndIf}
 
   ; Initialize InstallRAUX to 1 (checked)
   StrCpy $InstallRAUX "1"
@@ -184,7 +114,7 @@ FunctionEnd
 ; Custom finish page
 Function CustomFinishPage
   nsDialogs::Create 1018
-  Pop $Dialog
+  Pop $R0
 
   ${NSD_CreateLabel} 0 20 100% 40u "$GAIA_STRING has been installed successfully! A shortcut has been added to your Desktop.$\n$\n$\nWhat would you like to do next?"
   Pop $0
@@ -217,7 +147,6 @@ FunctionEnd
 ; MUI Settings
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "LICENSE"
-Page custom WarningPage
 !insertmacro MUI_PAGE_DIRECTORY
 Page custom RAUXOptionsPage RAUXOptionsLeave
 !insertmacro MUI_PAGE_INSTFILES
@@ -479,8 +408,8 @@ Section "-Install Main Components" SEC01
 
       lemonade_download_success:
         DetailPrint "- Download successful ($TEMP\Lemonade_Server_Installer.exe), installing Lemonade..."
-        ExecWait '"$TEMP\Lemonade_Server_Installer.exe" /Extras=hybrid' $2
 
+        ExecWait '"$TEMP\Lemonade_Server_Installer.exe" /Extras=hybrid' $2
         DetailPrint "- Lemonade installer finished with exit code: $2"
 
         ; Verify that lemonade was actually installed with the correct version
@@ -774,7 +703,11 @@ Function run_raux_installer
     ${EndIf}
 
     ; Start RAUX installer asynchronously (non-blocking)
-    Exec '"$R8"'
+    ${If} ${Silent}
+      Exec '"$R8" /S'
+    ${Else}
+      Exec '"$R8"'
+    ${EndIf}
   ${Else}
     DetailPrint "[RAUX-Installer] Installation skipped by user choice"
   ${EndIf}
