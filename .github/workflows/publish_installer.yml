@@ -10,6 +10,9 @@ on:
   merge_group:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-installer:
     uses: ./.github/workflows/build_installer.yml
