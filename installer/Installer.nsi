@@ -3,7 +3,7 @@
 ; GAIA Installer Script
 
 ; Define command line parameters
-!define /ifndef RAUX_VERSION "v0.6.5+raux.0.2.1"
+!define /ifndef RAUX_VERSION "v0.6.5+raux.0.2.2"
 !define /ifndef RAUX_PRODUCT_NAME "GAIA BETA"
 !define /ifndef RAUX_PRODUCT_SQUIRREL_NAME "GaiaUI"
 !define /ifndef RAUX_PRODUCT_SQUIRREL_PATH "$LOCALAPPDATA\GaiaUI"
@@ -412,53 +412,19 @@ Section "-Install Main Components" SEC01
         ExecWait '"$TEMP\Lemonade_Server_Installer.exe" /Extras=hybrid' $2
         DetailPrint "- Lemonade installer finished with exit code: $2"
 
-        ; Verify that lemonade was actually installed with the correct version
-        DetailPrint "- Verifying Lemonade installation and version..."
-        DetailPrint "- Expected version after installation: ${LEMONADE_VERSION}"
-
-        ; Use our Python script to verify the correct version was installed
-        nsExec::ExecToStack 'cmd /c ""$INSTDIR\python\python.exe" "$INSTDIR\installer_utils.py" "${LEMONADE_VERSION}""'
-        Pop $3  ; Return value (0 if compatible, 1 if not compatible)
-        Pop $4  ; Command output
-
-        DetailPrint "- Post-installation version check result:"
-        DetailPrint "- Return code: $3"
-        DetailPrint "- Output: $4"
-
-        ${If} $3 == "0"
-          DetailPrint "- Lemonade installation verification successful - correct version installed"
+        ; Check if Lemonade installer succeeded based on exit code
+        ${If} $2 == "0"
+          DetailPrint "- Lemonade installation successful (exit code: $2)"
           ${IfNot} ${Silent}
             MessageBox MB_OK "Lemonade has been successfully installed."
           ${EndIf}
         ${Else}
-          DetailPrint "- Lemonade installation verification failed - wrong version or installation blocked"
-
-          ; Extract the detected version from the Python script output if available
-          ${StrLoc} $5 "$4" "VERSION:" ">"
-          ${If} $5 != ""
-            ; Calculate the position after "VERSION:" (8 characters)
-            IntOp $5 $5 + 8
-            StrCpy $6 "$4" "" $5  ; Extract everything after "VERSION:"
-
-            ; Find the end of the line to get only the version part
-            ${StrLoc} $7 "$6" "$\r" ">"
-            ${If} $7 == ""
-              ${StrLoc} $7 "$6" "$\n" ">"
-            ${EndIf}
-            ${If} $7 != ""
-              StrCpy $6 "$6" $7 0  ; Get only the version part before newline
-            ${EndIf}
-
-            DetailPrint "- Detected version after installation: $6"
-            ${IfNot} ${Silent}
-              MessageBox MB_OK "Lemonade installation failed. Expected version ${LEMONADE_VERSION} but found version $6. The installer may have been blocked by security software. Please install Lemonade manually from https://lemonade-server.ai and ensure it's not quarantined.$\n$\nInstaller exit code: $2"
-            ${EndIf}
-          ${Else}
-            DetailPrint "- Could not detect lemonade version after installation"
-            ${IfNot} ${Silent}
-              MessageBox MB_OK "Lemonade installation failed or was blocked by security software. Please install Lemonade manually from https://lemonade-server.ai and ensure it's not quarantined.$\n$\nInstaller exit code: $2$\nVerification failed with code: $3"
-            ${EndIf}
+          DetailPrint "- Lemonade installation failed (exit code: $2)"
+          ${IfNot} ${Silent}
+            MessageBox MB_OK "Lemonade installation failed with exit code $2. The installer may have been blocked by security software. Please install Lemonade manually from https://lemonade-server.ai and ensure it's not quarantined."
+            Abort
           ${EndIf}
+          ; Exit installation if Lemonade installer failed
           GoTo exit_installer
         ${EndIf}
 
