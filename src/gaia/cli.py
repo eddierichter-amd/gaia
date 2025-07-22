@@ -635,6 +635,94 @@ Examples:
         help="Similarity threshold for evaluation (default: 0.7)",
     )
 
+    # Add new subparser for RAG evaluation
+    eval_parser = subparsers.add_parser(
+        "eval",
+        help="Evaluate RAG system performance using results data",
+        parents=[parent_parser],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Evaluate RAG results file
+  gaia-cli eval -f ./output/templates/introduction.template.json
+
+  # Evaluate with custom output directory
+  gaia-cli eval -f ./output/rag/results.json -o ./output/eval
+
+  # Evaluate with specific Claude model
+  gaia-cli eval -f ./output/rag/results.json -m claude-3-opus-20240229
+
+  # Evaluate and display summary only (no detailed report file)
+  gaia-cli eval -f ./output/rag/results.json --summary-only
+        """,
+    )
+
+    eval_parser.add_argument(
+        "-f",
+        "--results-file",
+        type=str,
+        required=True,
+        help="Path to the RAG results JSON file (template or results)",
+    )
+    eval_parser.add_argument(
+        "-o",
+        "--output-dir",
+        type=str,
+        default="./output/eval",
+        help="Output directory for evaluation report (default: ./output/eval)",
+    )
+    eval_parser.add_argument(
+        "-m",
+        "--model",
+        type=str,
+        default="claude-sonnet-4-20250514",
+        help="Claude model to use for evaluation (default: claude-sonnet-4-20250514)",
+    )
+    eval_parser.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="Only display summary, don't save detailed evaluation report",
+    )
+
+    # Add new subparser for generating summary reports from evaluation directories
+    report_parser = subparsers.add_parser(
+        "report",
+        help="Generate summary report from evaluation results directory",
+        parents=[parent_parser],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Generate report from evaluation directory
+  gaia-cli report -d ./output/eval
+
+  # Generate report with custom output filename
+  gaia-cli report -d ./output/eval -o Model_Comparison_Report.md
+
+  # Generate report and display summary only
+  gaia-cli report -d ./output/eval --summary-only
+        """,
+    )
+
+    report_parser.add_argument(
+        "-d",
+        "--eval-dir",
+        type=str,
+        required=True,
+        help="Directory containing .eval.json files to analyze",
+    )
+    report_parser.add_argument(
+        "-o",
+        "--output-file",
+        type=str,
+        default="LLM_RAG_Evaluation_Report.md",
+        help="Output filename for the markdown report (default: LLM_RAG_Evaluation_Report.md)",
+    )
+    report_parser.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="Only display summary to console, don't save report file",
+    )
+
     args = parser.parse_args()
 
     # Check if action is specified
@@ -662,6 +750,74 @@ Examples:
             log.error(f"Error executing {args.action}: {e}")
             print(f"❌ Error: {e}")
             sys.exit(1)
+        return
+
+    # Handle report generation command
+    if args.action == "report":
+        log.info("Generating summary report from evaluation directory")
+        try:
+            from gaia.eval.eval import RagEvaluator
+        except ImportError as e:
+            log.error(f"Failed to import RagEvaluator: {e}")
+            print(
+                "Error: Failed to import eval module. Please ensure all dependencies are installed."
+            )
+            return
+
+        try:
+            evaluator = RagEvaluator()
+
+            # If summary_only is True, don't save the report file
+            output_path = None if args.summary_only else args.output_file
+
+            result = evaluator.generate_summary_report(
+                eval_dir=args.eval_dir, output_path=output_path or "temp_report.md"
+            )
+
+            print(
+                f"✓ Successfully analyzed {result['models_analyzed']} evaluation files"
+            )
+
+            if not args.summary_only:
+                print(f"  Report saved to: {result['report_path']}")
+
+            # Display key metrics summary
+            models_data = result["summary_data"]
+            if models_data:
+                best_model = models_data[0]
+                print(
+                    f"  Best performing model: {best_model['name']} ({best_model['pass_rate']:.0%} pass rate)"
+                )
+                print(
+                    f"  Overall performance range: {models_data[-1]['pass_rate']:.0%} - {best_model['pass_rate']:.0%}"
+                )
+
+                # Check if any model meets production standards
+                production_ready = any(
+                    m["pass_rate"] >= 0.7 and m["mean_similarity"] >= 0.7
+                    for m in models_data
+                )
+                if production_ready:
+                    print("  Status: Some models approaching production readiness")
+                else:
+                    print(
+                        "  Status: No models meet production standards (70% pass rate + 0.7 similarity)"
+                    )
+
+            # Clean up temp file if using summary_only
+            if args.summary_only and output_path is None:
+                import os
+
+                try:
+                    os.remove("temp_report.md")
+                except OSError:
+                    pass
+
+        except Exception as e:
+            log.error(f"Error generating report: {e}")
+            print(f"Error generating report: {e}")
+            return
+
         return
 
     # Handle utility commands
@@ -1037,10 +1193,215 @@ Let me know your answer!
 
         return
 
-    # Log error for unknown action
-    log.error(f"Unknown action specified: {args.action}")
-    parser.print_help()
-    return
+    # Handle groundtruth generation
+    if args.action == "groundtruth":
+        log.info("Starting ground truth generation")
+        try:
+            from gaia.eval.groundtruth import GroundTruthGenerator
+        except ImportError as e:
+            log.error(f"Failed to import GroundTruthGenerator: {e}")
+            print(
+                "Error: Failed to import groundtruth module. Please ensure all dependencies are installed."
+            )
+            return
+
+        # Initialize generator
+        try:
+            generator = GroundTruthGenerator(
+                model=args.model, max_tokens=args.max_tokens
+            )
+        except Exception as e:
+            log.error(f"Error initializing generator: {e}")
+            print(f"Error initializing generator: {e}")
+            return
+
+        # Load custom prompt if provided
+        custom_prompt = None
+        if args.custom_prompt:
+            try:
+                with open(args.custom_prompt, "r", encoding="utf-8") as f:
+                    custom_prompt = f.read().strip()
+                print(f"Using custom prompt from: {args.custom_prompt}")
+            except Exception as e:
+                log.error(f"Error loading custom prompt: {e}")
+                print(f"Error loading custom prompt: {e}")
+                return
+
+        save_text = not args.no_save_text
+
+        try:
+            if args.file:
+                # Process single file
+                print(f"Processing single file: {args.file}")
+                result = generator.generate(
+                    file_path=args.file,
+                    prompt=custom_prompt,
+                    save_text=save_text,
+                    output_dir=args.output_dir,
+                    num_samples=args.num_samples,
+                )
+                print("✓ Successfully generated ground truth data")
+                print(f"  Output: {args.output_dir}")
+                usage = result["metadata"]["usage"]
+                cost = result["metadata"]["cost"]
+                print(
+                    f"  Token usage: {usage['input_tokens']:,} input + {usage['output_tokens']:,} output = {usage['total_tokens']:,} total"
+                )
+                print(
+                    f"  Cost: ${cost['input_cost']:.4f} input + ${cost['output_cost']:.4f} output = ${cost['total_cost']:.4f} total"
+                )
+                print(
+                    f"  QA pairs: {len(result['analysis']['qa_pairs'])} (${cost['total_cost']/len(result['analysis']['qa_pairs']):.4f} per pair)"
+                )
+
+            elif args.directory:
+                # Process directory
+                print(f"Processing directory: {args.directory}")
+                print(f"File pattern: {args.pattern}")
+                results = generator.generate_batch(
+                    input_dir=args.directory,
+                    file_pattern=args.pattern,
+                    prompt=custom_prompt,
+                    save_text=save_text,
+                    output_dir=args.output_dir,
+                    num_samples=args.num_samples,
+                )
+
+                if results:
+                    total_pairs = sum(len(r["analysis"]["qa_pairs"]) for r in results)
+                    total_usage = {
+                        "input_tokens": sum(
+                            r["metadata"]["usage"]["input_tokens"] for r in results
+                        ),
+                        "output_tokens": sum(
+                            r["metadata"]["usage"]["output_tokens"] for r in results
+                        ),
+                        "total_tokens": sum(
+                            r["metadata"]["usage"]["total_tokens"] for r in results
+                        ),
+                    }
+                    total_cost = {
+                        "input_cost": sum(
+                            r["metadata"]["cost"]["input_cost"] for r in results
+                        ),
+                        "output_cost": sum(
+                            r["metadata"]["cost"]["output_cost"] for r in results
+                        ),
+                        "total_cost": sum(
+                            r["metadata"]["cost"]["total_cost"] for r in results
+                        ),
+                    }
+                    print(f"✓ Successfully processed {len(results)} files")
+                    print(f"  Output: {args.output_dir}")
+                    print(f"  Total QA pairs: {total_pairs}")
+                    print(
+                        f"  Total token usage: {total_usage['input_tokens']:,} input + {total_usage['output_tokens']:,} output = {total_usage['total_tokens']:,} total"
+                    )
+                    print(
+                        f"  Total cost: ${total_cost['input_cost']:.4f} input + ${total_cost['output_cost']:.4f} output = ${total_cost['total_cost']:.4f} total"
+                    )
+                    print(
+                        f"  Average cost per file: ${total_cost['total_cost']/len(results):.4f}"
+                    )
+                    print(
+                        f"  Average cost per QA pair: ${total_cost['total_cost']/total_pairs:.4f}"
+                    )
+                else:
+                    print("No files were processed successfully")
+                    return
+
+        except Exception as e:
+            log.error(f"Error during groundtruth processing: {e}")
+            print(f"Error during processing: {e}")
+            return
+
+        return
+
+    # Handle template creation
+    if args.action == "create-template":
+        log.info("Creating template results file")
+        try:
+            from gaia.eval.eval import RagEvaluator
+        except ImportError as e:
+            log.error(f"Failed to import RagEvaluator: {e}")
+            print(
+                "Error: Failed to import eval module. Please ensure all dependencies are installed."
+            )
+            return
+
+        try:
+            evaluator = RagEvaluator()
+            template_path = evaluator.create_template(
+                groundtruth_file=args.groundtruth_file,
+                output_dir=args.output_dir,
+                similarity_threshold=args.threshold,
+            )
+            print("✓ Successfully created template file")
+            print(f"  Template: {template_path}")
+            print(
+                "  Instructions: Fill in the 'response' fields with your RAG system outputs"
+            )
+            print(
+                "  Then run: gaia-cli eval -f <template_file> to evaluate performance"
+            )
+
+        except Exception as e:
+            log.error(f"Error creating template: {e}")
+            print(f"Error creating template: {e}")
+            return
+
+        return
+
+    # Handle RAG evaluation
+    if args.action == "eval":
+        log.info("Evaluating RAG system performance")
+        try:
+            from gaia.eval.eval import RagEvaluator
+        except ImportError as e:
+            log.error(f"Failed to import RagEvaluator: {e}")
+            print(
+                "Error: Failed to import eval module. Please ensure all dependencies are installed."
+            )
+            return
+
+        try:
+            evaluator = RagEvaluator(model=args.model)
+
+            # If summary_only is True, don't save to output_dir (None)
+            output_dir = None if args.summary_only else args.output_dir
+
+            evaluation_data = evaluator.generate_enhanced_report(
+                results_path=args.results_file, output_dir=output_dir
+            )
+
+            print("✓ Successfully evaluated RAG system")
+
+            # Display summary information
+            overall_rating = evaluation_data.get("overall_rating", {})
+            print(f"  Overall Rating: {overall_rating.get('rating', 'N/A')}")
+
+            metrics = overall_rating.get("metrics", {})
+            if metrics:
+                print(f"  Questions: {metrics.get('num_questions', 'N/A')}")
+                print(f"  Pass Rate: {metrics.get('pass_rate', 'N/A'):.1%}")
+                print(f"  Mean Similarity: {metrics.get('mean_similarity', 'N/A'):.3f}")
+
+            if not args.summary_only:
+                print(f"  Detailed Report: {args.output_dir}")
+
+            # Print cost information if available
+            if evaluation_data.get("total_usage") and evaluation_data.get("total_cost"):
+                total_usage = evaluation_data["total_usage"]
+                total_cost = evaluation_data["total_cost"]
+                print(f"  Token Usage: {total_usage['total_tokens']:,} total")
+                print(f"  Cost: ${total_cost['total_cost']:.4f}")
+
+        except Exception as e:
+            log.error(f"Error evaluating RAG system: {e}")
+            print(f"Error evaluating RAG system: {e}")
+            return
+
+        return
 
 
 def kill_process_by_port(port):

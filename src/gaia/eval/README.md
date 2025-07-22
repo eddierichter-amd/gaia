@@ -4,11 +4,14 @@ A comprehensive framework for evaluating Retrieval Augmented Generation (RAG) sy
 
 ## Overview
 
-This evaluation framework consists of three main components:
+This evaluation framework consists of four main components:
 
 1. **Ground Truth Generation** (`groundtruth.py`) - Generates question-answer pairs from documents
 2. **Claude Analysis** (`claude.py`) - Provides AI-powered qualitative analysis
 3. **RAG Evaluation** (`eval.py`) - Evaluates RAG system performance with metrics and analysis
+4. **Summary Reporting** (`eval.py`) - Generates comprehensive reports comparing multiple model evaluations
+
+All components are fully integrated into the Gaia CLI for easy command-line usage, with Python APIs available for programmatic access.
 
 ## Components
 
@@ -41,6 +44,10 @@ Evaluates RAG system performance using similarity scores and qualitative analysi
 - Qualitative analysis using Claude AI
 - Detailed reporting and recommendations
 - Per-question and overall analysis
+- Multi-model comparison reports
+- Automated performance ranking
+- Cost efficiency analysis
+- Strategic investment recommendations
 
 ## Setup
 
@@ -98,7 +105,7 @@ gaia-cli groundtruth -d ./data/html/blender --num-samples 10
 - `-d, --directory`: Process all matching files in a directory
 - `-o, --output-dir`: Output directory (default: `./output/groundtruth`)
 - `-p, --pattern`: File pattern for directory processing (default: `*.html`)
-- `-m, --model`: Claude model to use (default: `claude-3-7-sonnet-20250219`)
+- `-m, --model`: Claude model to use (default: `claude-sonnet-4-20250514`)
 - `--max-tokens`: Maximum tokens for responses (default: 4096)
 - `--num-samples`: Number of Q&A pairs to generate per document (default: 5)
 - `--no-save-text`: Don't save extracted text for HTML files
@@ -131,9 +138,10 @@ results = generator.generate_batch(
 ```
 
 **Output**: Creates `.groundtruth.json` files containing:
-- Document metadata
+- Document metadata (timestamp, model used, token usage, cost)
 - Document summary
 - Q&A pairs for evaluation
+- Cost tracking: Token usage and API costs per document
 
 ### 2. Create Results Template (Optional)
 
@@ -165,13 +173,14 @@ This creates a template file with placeholder responses that you can manually fi
       {
         "query": "What is Blender?",
         "ground_truth": "Blender is a free and open-source 3D...",
-        "response": "[FILL IN YOUR RAG SYSTEM RESPONSE FOR QUESTION 1]",
-        "similarity": 0.0
+        "response": "[FILL IN YOUR RAG SYSTEM RESPONSE FOR QUESTION 1]"
       }
     ]
   }
 }
 ```
+
+> **Note**: Similarity scores are calculated automatically during evaluation, not stored in templates.
 
 ### 3. Run Your RAG System
 
@@ -197,23 +206,58 @@ Your results should be saved in JSON format with this structure:
       {
         "query": "What is Blender?",
         "ground_truth": "Blender is a free and open-source 3D...",
-        "response": "Blender is a 3D modeling software...",
-        "similarity": 0.85
+        "response": "Blender is a 3D modeling software..."
       }
     ]
   }
 }
 ```
 
+> **Note**: Similarity scores and pass/fail determinations are calculated automatically during evaluation using the comprehensive scoring system.
+
 ### 4. Evaluate Results
 
-Analyze your RAG system's performance:
+#### Command Line Interface (Recommended)
+
+Analyze your RAG system's performance using the CLI:
+
+```bash
+# Evaluate RAG results file
+gaia-cli eval -f ./output/templates/introduction.template.json
+
+# Evaluate with custom output directory
+gaia-cli eval -f ./output/rag/results.json -o ./output/eval
+
+# Evaluate with specific Claude model
+gaia-cli eval -f ./output/rag/results.json -m claude-3-opus-20240229
+
+# Evaluate and display summary only (no detailed report file)
+gaia-cli eval -f ./output/rag/results.json --summary-only
+```
+
+**Command Line Options:**
+- `-f, --results-file`: Path to the RAG results JSON file (template or results) (required)
+- `-o, --output-dir`: Output directory for evaluation report (default: `./output/eval`)
+- `-m, --model`: Claude model to use for evaluation (default: `claude-sonnet-4-20250514`)
+- `--summary-only`: Only display summary, don't save detailed evaluation report
+
+**Evaluation Output**: The evaluation generates comprehensive reports including:
+- Overall performance rating (excellent/good/fair/poor) with detailed explanation
+- Per-question analysis with 4-criteria scoring (correctness, completeness, conciseness, relevance)
+- Similarity scores and comprehensive pass/fail determinations
+- Cost tracking: Token usage and API costs per question and total
+- Strengths, weaknesses, and actionable improvement recommendations
+- Statistical metrics: mean, median, min, max, standard deviation of similarity scores
+
+#### Python API
+
+You can also evaluate programmatically:
 
 ```python
 from gaia.eval.eval import RagEvaluator
 
 # Initialize evaluator
-evaluator = RagEvaluator(model="claude-3-7-sonnet-20250219")
+evaluator = RagEvaluator()
 
 # Generate comprehensive evaluation
 evaluation_data = evaluator.generate_enhanced_report(
@@ -224,6 +268,64 @@ evaluation_data = evaluator.generate_enhanced_report(
 # Print key metrics
 print("Overall Rating:", evaluation_data['overall_rating']['rating'])
 print("Pass Rate:", evaluation_data['overall_rating']['metrics']['pass_rate'])
+print("Mean Similarity:", evaluation_data['overall_rating']['metrics']['mean_similarity'])
+print("Total Cost:", f"${evaluation_data['total_cost']['total_cost']:.4f}")
+print("Cost per Question:", f"${evaluation_data['total_cost']['total_cost']/len(evaluation_data['per_question']):.4f}")
+```
+
+### 5. Generate Summary Report (New!)
+
+After evaluating multiple models, generate a comprehensive comparison report:
+
+#### Command Line Interface (Recommended)
+
+```bash
+# Generate report from evaluation directory
+gaia-cli report -d ./output/eval
+
+# Generate report with custom output filename
+gaia-cli report -d ./output/eval -o Model_Performance_Analysis.md
+
+# Generate report and display summary only (no file output)
+gaia-cli report -d ./output/eval --summary-only
+```
+
+**Command Line Options:**
+- `-d, --eval-dir`: Directory containing .eval.json files to analyze (required)
+- `-o, --output-file`: Output filename for the markdown report (default: `LLM_RAG_Evaluation_Report.md`)
+- `--summary-only`: Only display summary to console, don't save report file
+
+**Report Features:**
+The generated markdown report includes:
+- **Executive Summary** with performance ranking and production readiness assessment
+- **Key Performance Metrics Table** with pass rates, similarity scores, and ratings
+- **Critical Failure Patterns** analysis identifying common issues across models
+- **Model-Specific Analysis** comparing best and worst performers
+- **Cost Efficiency Analysis** with ROI comparison across models
+- **Technical Actions** providing prioritized improvement recommendations
+- **Investment Decisions** and timeline guidance for strategic resource allocation
+
+#### Python API
+
+```python
+from gaia.eval.eval import RagEvaluator
+
+# Initialize evaluator
+evaluator = RagEvaluator()
+
+# Generate summary report
+result = evaluator.generate_summary_report(
+    eval_dir="./output/eval",
+    output_path="Model_Comparison_Report.md"
+)
+
+print(f"Analyzed {result['models_analyzed']} models")
+print(f"Report saved to: {result['report_path']}")
+
+# Access summary data
+models_data = result['summary_data']
+best_model = models_data[0]  # Sorted by pass rate
+print(f"Best model: {best_model['name']} ({best_model['pass_rate']:.0%} pass rate)")
 ```
 
 ## File Structure
@@ -236,22 +338,32 @@ output/
 │   └── *.template.json
 ├── rag/                  # RAG system results
 │   └── *.results.json
-└── eval/                 # Evaluation reports
-    └── *.eval.json
+├── eval/                 # Evaluation reports
+│   └── *.eval.json
+└── reports/              # Summary comparison reports
+    └── *.md
 ```
 
 ## Evaluation Metrics
 
 ### Quantitative Metrics
-- **Similarity Scores**: Cosine similarity between responses and ground truth
-- **Pass Rate**: Percentage of responses above similarity threshold
-- **Statistical Analysis**: Mean, median, min, max, standard deviation
+- **Similarity Scores**: TF-IDF cosine similarity calculated dynamically during evaluation
+- **Pass Rate**: Percentage of responses meeting comprehensive pass criteria
+- **Statistical Analysis**: Mean, median, min, max, standard deviation of similarity scores
+- **Cost Tracking**: Token usage and API costs per question and total evaluation
 
 ### Qualitative Analysis (Claude AI)
-- **Correctness**: Factual accuracy assessment
-- **Completeness**: Coverage of the question
-- **Conciseness**: Appropriate brevity
-- **Relevance**: Direct addressing of the query
+- **Correctness**: Factual accuracy assessment (40% weight)
+- **Completeness**: Coverage of the question (30% weight)
+- **Conciseness**: Appropriate brevity (15% weight)
+- **Relevance**: Direct addressing of the query (15% weight)
+
+### Comprehensive Pass/Fail Logic
+The system uses sophisticated evaluation criteria combining quantitative and qualitative metrics:
+- **Similarity-based**: Pass if TF-IDF cosine similarity ≥ threshold (default 0.7)
+- **Qualitative-based**: Pass if weighted qualitative score ≥ 0.6 AND correctness ≥ "fair"
+- **Combined logic**: Pass if EITHER similarity OR qualitative criteria are met
+- **Hard failure**: Automatic fail if correctness rating is "poor" regardless of other scores
 
 ### Overall Ratings
 - **Excellent**: Pass rate ≥90%, Mean similarity ≥0.8
@@ -300,12 +412,23 @@ output/
    ```
 
 5. **Evaluate Performance**
-   ```python
-   evaluator = RagEvaluator()
-   evaluation = evaluator.generate_enhanced_report(
-       "./output/templates/introduction.template.json",  # or your results file
-       "./output/eval"
-   )
+   ```bash
+   # Using Gaia CLI (recommended)
+   gaia-cli eval -f ./output/templates/introduction.template.json -o ./output/eval
+
+   # Or using Python API
+   # evaluator = RagEvaluator()
+   # evaluation = evaluator.generate_enhanced_report("./output/templates/introduction.template.json", "./output/eval")
+   ```
+
+6. **Generate Summary Report (New!)**
+   ```bash
+   # Generate comprehensive comparison report after evaluating multiple models
+   gaia-cli report -d ./output/eval
+
+   # Or using Python API
+   # evaluator = RagEvaluator()
+   # result = evaluator.generate_summary_report("./output/eval", "Model_Analysis_Report.md")
    ```
 
 ## Error Handling
@@ -324,6 +447,9 @@ The framework includes robust error handling:
 3. **Batch Processing**: Process multiple documents together for efficiency
 4. **Output Organization**: Use consistent directory structure for outputs
 5. **Token Management**: Monitor token usage for cost optimization
+6. **Multi-Model Testing**: Evaluate multiple models against the same ground truth for comparison
+7. **Report Generation**: Use summary reports to identify patterns and make strategic decisions
+8. **Production Standards**: Aim for 70% pass rate + 0.7 mean similarity for production readiness
 
 ## Command Line Help
 
@@ -336,12 +462,20 @@ gaia-cli groundtruth --help
 # Show help for template creation
 gaia-cli create-template --help
 
+# Show help for evaluation
+gaia-cli eval --help
+
+# Show help for summary reporting
+gaia-cli report --help
+
 # Show help for all Gaia CLI commands
 gaia-cli --help
 
 # Examples are included in the help output
 gaia-cli groundtruth -h
 gaia-cli create-template -h
+gaia-cli eval -h
+gaia-cli report -h
 ```
 
 ## Troubleshooting
@@ -356,8 +490,12 @@ gaia-cli create-template -h
 6. **Module Import**: Use `gaia-cli groundtruth` (recommended) or run from project root: `python -m gaia.eval.groundtruth`
 
 **Template Issues:**
-6. **Empty Template**: Ensure ground truth file contains QA pairs in the expected format
-7. **Invalid Field Names**: Template uses 'query' and 'ground_truth' - verify your ground truth structure
+7. **Empty Template**: Ensure ground truth file contains QA pairs in the expected format
+8. **Invalid Field Names**: Template uses 'query' and 'ground_truth' - verify your ground truth structure
+
+**Report Issues:**
+9. **No Evaluation Files**: Ensure the eval directory contains .eval.json files
+10. **Inconsistent Data**: Verify all evaluation files have the expected structure and metrics
 
 **Debug Mode:**
 Enable detailed logging by setting log level to DEBUG in your application.

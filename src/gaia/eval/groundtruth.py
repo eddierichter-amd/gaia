@@ -59,11 +59,13 @@ class GroundTruthGenerator:
         prompt = prompt or self.get_default_prompt(num_samples)
 
         try:
-            # Generate analysis using Claude
-            analysis = self.claude.analyze_file(
+            # Generate analysis using Claude with usage tracking
+            response = self.claude.analyze_file_with_usage(
                 str(file_path), prompt, save_text=save_text
             )
-            token_count = self.claude.count_file_tokens(str(file_path), prompt)
+            analysis = response["content"]
+            usage = response["usage"]
+            cost = response["cost"]
 
             # Debug: Log the raw analysis response
             self.log.debug(
@@ -110,15 +112,16 @@ class GroundTruthGenerator:
                         f"No valid JSON found in Claude response: {str(je)}"
                     )
 
-            # Prepare output data with metadata
+            # Prepare output data with metadata including usage and cost
             output_data = {
                 "metadata": {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "model": self.claude.model,
                     "source_file": str(file_path),
                     "prompt": prompt,
-                    "token_count": token_count,
                     "num_samples_requested": num_samples,
+                    "usage": usage,
+                    "cost": cost,
                 },
                 "analysis": parsed_analysis,
             }
@@ -286,8 +289,17 @@ Examples:
             )
             print(f"✓ Successfully generated ground truth data")
             print(f"  Output: {args.output_dir}")
-            print(f"  Token count: {result['metadata']['token_count']}")
-            print(f"  QA pairs: {len(result['analysis']['qa_pairs'])}")
+            usage = result["metadata"]["usage"]
+            cost = result["metadata"]["cost"]
+            print(
+                f"  Token usage: {usage['input_tokens']:,} input + {usage['output_tokens']:,} output = {usage['total_tokens']:,} total"
+            )
+            print(
+                f"  Cost: ${cost['input_cost']:.4f} input + ${cost['output_cost']:.4f} output = ${cost['total_cost']:.4f} total"
+            )
+            print(
+                f"  QA pairs: {len(result['analysis']['qa_pairs'])} (${cost['total_cost']/len(result['analysis']['qa_pairs']):.4f} per pair)"
+            )
 
         elif args.directory:
             # Process directory
@@ -304,11 +316,43 @@ Examples:
 
             if results:
                 total_pairs = sum(len(r["analysis"]["qa_pairs"]) for r in results)
-                total_tokens = sum(r["metadata"]["token_count"] for r in results)
+                total_usage = {
+                    "input_tokens": sum(
+                        r["metadata"]["usage"]["input_tokens"] for r in results
+                    ),
+                    "output_tokens": sum(
+                        r["metadata"]["usage"]["output_tokens"] for r in results
+                    ),
+                    "total_tokens": sum(
+                        r["metadata"]["usage"]["total_tokens"] for r in results
+                    ),
+                }
+                total_cost = {
+                    "input_cost": sum(
+                        r["metadata"]["cost"]["input_cost"] for r in results
+                    ),
+                    "output_cost": sum(
+                        r["metadata"]["cost"]["output_cost"] for r in results
+                    ),
+                    "total_cost": sum(
+                        r["metadata"]["cost"]["total_cost"] for r in results
+                    ),
+                }
                 print(f"✓ Successfully processed {len(results)} files")
                 print(f"  Output: {args.output_dir}")
                 print(f"  Total QA pairs: {total_pairs}")
-                print(f"  Total tokens: {total_tokens}")
+                print(
+                    f"  Total token usage: {total_usage['input_tokens']:,} input + {total_usage['output_tokens']:,} output = {total_usage['total_tokens']:,} total"
+                )
+                print(
+                    f"  Total cost: ${total_cost['input_cost']:.4f} input + ${total_cost['output_cost']:.4f} output = ${total_cost['total_cost']:.4f} total"
+                )
+                print(
+                    f"  Average cost per file: ${total_cost['total_cost']/len(results):.4f}"
+                )
+                print(
+                    f"  Average cost per QA pair: ${total_cost['total_cost']/total_pairs:.4f}"
+                )
             else:
                 print("No files were processed successfully")
                 return 1

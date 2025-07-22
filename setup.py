@@ -65,6 +65,8 @@ setup(
         "eval" : [
             "anthropic",
             "bs4",
+            "scikit-learn",
+            "numpy",
         ],
         "talk":[
             "pyaudio",
