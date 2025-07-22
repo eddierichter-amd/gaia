@@ -595,6 +595,46 @@ Examples:
         help="Number of Q&A pairs to generate per document (default: 5)",
     )
 
+    # Add new subparser for creating evaluation templates
+    template_parser = subparsers.add_parser(
+        "create-template",
+        help="Create a template results file from ground truth data for manual RAG evaluation",
+        parents=[parent_parser],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Create template from ground truth file
+  gaia-cli create-template -f ./output/groundtruth/introduction.groundtruth.json
+
+  # Create template with custom output path
+  gaia-cli create-template -f ./output/groundtruth/doc.groundtruth.json -o ./templates/
+
+  # Create template with custom similarity threshold
+  gaia-cli create-template -f ./output/groundtruth/doc.groundtruth.json --threshold 0.8
+        """,
+    )
+
+    template_parser.add_argument(
+        "-f",
+        "--groundtruth-file",
+        type=str,
+        required=True,
+        help="Path to the ground truth JSON file",
+    )
+    template_parser.add_argument(
+        "-o",
+        "--output-dir",
+        type=str,
+        default="./output/templates",
+        help="Output directory for template file (default: ./output/templates)",
+    )
+    template_parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.7,
+        help="Similarity threshold for evaluation (default: 0.7)",
+    )
+
     args = parser.parse_args()
 
     # Check if action is specified
@@ -877,6 +917,122 @@ Let me know your answer!
         except Exception as e:
             log.error(f"Error during groundtruth processing: {e}")
             print(f"❌ Error during processing: {e}")
+            return
+
+        return
+
+    # Handle groundtruth generation
+    if args.action == "groundtruth":
+        log.info("Starting ground truth generation")
+        try:
+            from gaia.eval.groundtruth import GroundTruthGenerator
+        except ImportError as e:
+            log.error(f"Failed to import GroundTruthGenerator: {e}")
+            print(
+                "Error: Failed to import groundtruth module. Please ensure all dependencies are installed."
+            )
+            return
+
+        # Initialize generator
+        try:
+            generator = GroundTruthGenerator(
+                model=args.model, max_tokens=args.max_tokens
+            )
+        except Exception as e:
+            log.error(f"Error initializing generator: {e}")
+            print(f"Error initializing generator: {e}")
+            return
+
+        # Load custom prompt if provided
+        custom_prompt = None
+        if args.custom_prompt:
+            try:
+                with open(args.custom_prompt, "r", encoding="utf-8") as f:
+                    custom_prompt = f.read().strip()
+                print(f"Using custom prompt from: {args.custom_prompt}")
+            except Exception as e:
+                log.error(f"Error loading custom prompt: {e}")
+                print(f"Error loading custom prompt: {e}")
+                return
+
+        save_text = not args.no_save_text
+
+        try:
+            if args.file:
+                # Process single file
+                print(f"Processing single file: {args.file}")
+                result = generator.generate(
+                    file_path=args.file,
+                    prompt=custom_prompt,
+                    save_text=save_text,
+                    output_dir=args.output_dir,
+                    num_samples=args.num_samples,
+                )
+                print("✓ Successfully generated ground truth data")
+                print(f"  Output: {args.output_dir}")
+                print(f"  Token count: {result['metadata']['token_count']}")
+                print(f"  QA pairs: {len(result['analysis']['qa_pairs'])}")
+
+            elif args.directory:
+                # Process directory
+                print(f"Processing directory: {args.directory}")
+                print(f"File pattern: {args.pattern}")
+                results = generator.generate_batch(
+                    input_dir=args.directory,
+                    file_pattern=args.pattern,
+                    prompt=custom_prompt,
+                    save_text=save_text,
+                    output_dir=args.output_dir,
+                    num_samples=args.num_samples,
+                )
+
+                if results:
+                    total_pairs = sum(len(r["analysis"]["qa_pairs"]) for r in results)
+                    total_tokens = sum(r["metadata"]["token_count"] for r in results)
+                    print(f"✓ Successfully processed {len(results)} files")
+                    print(f"  Output: {args.output_dir}")
+                    print(f"  Total QA pairs: {total_pairs}")
+                    print(f"  Total tokens: {total_tokens}")
+                else:
+                    print("No files were processed successfully")
+                    return
+
+        except Exception as e:
+            log.error(f"Error during groundtruth processing: {e}")
+            print(f"Error during processing: {e}")
+            return
+
+        return
+
+    # Handle template creation
+    if args.action == "create-template":
+        log.info("Creating template results file")
+        try:
+            from gaia.eval.eval import RagEvaluator
+        except ImportError as e:
+            log.error(f"Failed to import RagEvaluator: {e}")
+            print(
+                "Error: Failed to import eval module. Please ensure all dependencies are installed."
+            )
+            return
+
+        try:
+            evaluator = RagEvaluator()
+            template_path = evaluator.create_template(
+                groundtruth_file=args.groundtruth_file,
+                output_dir=args.output_dir,
+                similarity_threshold=args.threshold,
+            )
+            print("✓ Successfully created template file")
+            print(f"  Template: {template_path}")
+            print(
+                "  Instructions: Fill in the 'response' fields with your RAG system outputs"
+            )
+            print("  Then run: gaia-cli eval <template_file> to evaluate performance")
+
+        except Exception as e:
+            log.error(f"Error creating template: {e}")
+            print(f"Error creating template: {e}")
             return
 
         return

@@ -114,7 +114,7 @@ You can also use the generator programmatically:
 from gaia.eval.groundtruth import GroundTruthGenerator
 
 # Initialize generator
-generator = GroundTruthGenerator(model="claude-3-7-sonnet-20250219")
+generator = GroundTruthGenerator()
 
 # Generate for single document
 result = generator.generate(
@@ -135,9 +135,55 @@ results = generator.generate_batch(
 - Document summary
 - Q&A pairs for evaluation
 
-### 2. Run Your RAG System
+### 2. Create Results Template (Optional)
 
-Test your RAG system against the generated ground truth data. Your results should be saved in JSON format with this structure:
+For manual testing, you can create a template file that structures the ground truth data for easy copy-paste of responses:
+
+```bash
+# Create template from ground truth file
+gaia-cli create-template -f ./output/groundtruth/introduction.groundtruth.json
+
+# Create template with custom output directory
+gaia-cli create-template -f ./output/groundtruth/doc.groundtruth.json -o ./templates/
+
+# Create template with custom similarity threshold
+gaia-cli create-template -f ./output/groundtruth/doc.groundtruth.json --threshold 0.8
+```
+
+This creates a template file with placeholder responses that you can manually fill in:
+
+```json
+{
+  "metadata": {
+    "test_file": "path/to/groundtruth.json",
+    "timestamp": "2025-01-XX XX:XX:XX",
+    "similarity_threshold": 0.7,
+    "instructions": "Fill in the 'response' fields with your RAG system outputs, then evaluate using gaia-cli eval"
+  },
+  "analysis": {
+    "qa_results": [
+      {
+        "query": "What is Blender?",
+        "ground_truth": "Blender is a free and open-source 3D...",
+        "response": "[FILL IN YOUR RAG SYSTEM RESPONSE FOR QUESTION 1]",
+        "similarity": 0.0
+      }
+    ]
+  }
+}
+```
+
+### 3. Run Your RAG System
+
+Test your RAG system against the generated ground truth data. You can either:
+
+**Option A: Use the template (for manual testing)**
+1. Use `gaia-cli create-template` to generate a template file
+2. Fill in the `response` fields with your RAG system outputs
+3. Proceed to evaluation
+
+**Option B: Generate results programmatically**
+Your results should be saved in JSON format with this structure:
 
 ```json
 {
@@ -159,7 +205,7 @@ Test your RAG system against the generated ground truth data. Your results shoul
 }
 ```
 
-### 3. Evaluate Results
+### 4. Evaluate Results
 
 Analyze your RAG system's performance:
 
@@ -186,6 +232,8 @@ print("Pass Rate:", evaluation_data['overall_rating']['metrics']['pass_rate'])
 output/
 ├── groundtruth/          # Generated ground truth data
 │   └── *.groundtruth.json
+├── templates/            # Template files for manual testing
+│   └── *.template.json
 ├── rag/                  # RAG system results
 │   └── *.results.json
 └── eval/                 # Evaluation reports
@@ -235,17 +283,27 @@ output/
    # generator.generate_batch("./data/html/blender", output_dir="./output/groundtruth", num_samples=10)
    ```
 
-3. **Test RAG System**
-   ```python
-   # Your RAG system should process the ground truth and save results
-   # Results format: see section "2. Run Your RAG System" above
+3. **Create Template (For Manual Testing)**
+   ```bash
+   # Create template file for manual response entry
+   gaia-cli create-template -f ./output/groundtruth/introduction.groundtruth.json -o ./output/templates
    ```
 
-4. **Evaluate Performance**
+4. **Test RAG System**
+   ```bash
+   # Option A: Fill in template file manually with your RAG responses
+   # Edit ./output/templates/introduction.template.json
+
+   # Option B: Generate results programmatically
+   # Your RAG system should process the ground truth and save results
+   # Results format: see section "3. Run Your RAG System" above
+   ```
+
+5. **Evaluate Performance**
    ```python
    evaluator = RagEvaluator()
    evaluation = evaluator.generate_enhanced_report(
-       "./output/rag/results.json",
+       "./output/templates/introduction.template.json",  # or your results file
        "./output/eval"
    )
    ```
@@ -275,11 +333,15 @@ Get detailed usage information:
 # Show help and all available options for groundtruth
 gaia-cli groundtruth --help
 
+# Show help for template creation
+gaia-cli create-template --help
+
 # Show help for all Gaia CLI commands
 gaia-cli --help
 
 # Examples are included in the help output
 gaia-cli groundtruth -h
+gaia-cli create-template -h
 ```
 
 ## Troubleshooting
@@ -292,6 +354,10 @@ gaia-cli groundtruth -h
 4. **Token Limits**: Use appropriate max_tokens for your model
 5. **File Permissions**: Ensure read access to input files and write access to output directory
 6. **Module Import**: Use `gaia-cli groundtruth` (recommended) or run from project root: `python -m gaia.eval.groundtruth`
+
+**Template Issues:**
+6. **Empty Template**: Ensure ground truth file contains QA pairs in the expected format
+7. **Invalid Field Names**: Template uses 'query' and 'ground_truth' - verify your ground truth structure
 
 **Debug Mode:**
 Enable detailed logging by setting log level to DEBUG in your application.

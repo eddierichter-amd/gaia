@@ -404,6 +404,81 @@ class RagEvaluator:
             self.log.error(f"Error during evaluation: {str(e)}")
             raise
 
+    def create_template(
+        self,
+        groundtruth_file: str,
+        output_dir: str = "./output/templates",
+        similarity_threshold: float = 0.7,
+    ) -> str:
+        """
+        Create a template results file from ground truth data for manual RAG evaluation.
+
+        Args:
+            groundtruth_file: Path to the ground truth JSON file
+            output_dir: Directory to save the template file
+            similarity_threshold: Similarity threshold for evaluation
+
+        Returns:
+            Path to the created template file
+        """
+        try:
+            # Load ground truth data
+            with open(groundtruth_file, "r", encoding="utf-8") as f:
+                groundtruth_data = json.load(f)
+
+            # Extract QA pairs from ground truth
+            qa_pairs = groundtruth_data.get("analysis", {}).get("qa_pairs", [])
+            if not qa_pairs:
+                raise ValueError("No QA pairs found in ground truth file")
+
+            # Create template structure
+            template_data = {
+                "metadata": {
+                    "test_file": groundtruth_file,
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "similarity_threshold": similarity_threshold,
+                    "instructions": "Fill in the 'response' fields with your RAG system outputs, then evaluate using gaia-cli eval",
+                },
+                "analysis": {"qa_results": []},
+            }
+
+            # Convert QA pairs to result template format
+            for i, qa_pair in enumerate(qa_pairs):
+                result_entry = {
+                    "query": qa_pair.get("question", qa_pair.get("query", "")),
+                    "ground_truth": qa_pair.get(
+                        "answer", qa_pair.get("ground_truth", "")
+                    ),
+                    "response": f"[FILL IN YOUR RAG SYSTEM RESPONSE FOR QUESTION {i+1}]",
+                    "similarity": 0.0,  # Placeholder - will be calculated during evaluation
+                }
+                template_data["analysis"]["qa_results"].append(result_entry)
+
+            # Create output directory
+            output_path = Path(output_dir)
+            output_path.mkdir(parents=True, exist_ok=True)
+
+            # Generate output filename
+            groundtruth_filename = Path(groundtruth_file).stem
+            if groundtruth_filename.endswith(".groundtruth"):
+                base_name = groundtruth_filename[:-12]  # Remove '.groundtruth'
+            else:
+                base_name = groundtruth_filename
+
+            template_filename = f"{base_name}.template.json"
+            template_path = output_path / template_filename
+
+            # Save template file
+            with open(template_path, "w", encoding="utf-8") as f:
+                json.dump(template_data, f, indent=2, ensure_ascii=False)
+
+            self.log.info(f"Created template with {len(qa_pairs)} questions")
+            return str(template_path)
+
+        except Exception as e:
+            self.log.error(f"Error creating template: {e}")
+            raise
+
 
 if __name__ == "__main__":
     # Example usage
