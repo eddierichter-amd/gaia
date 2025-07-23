@@ -14,8 +14,8 @@ class GroundTruthGenerator:
         """Generate default prompt with specified number of samples."""
         return f"""
     Given this document, generate exactly {num_samples} short queries a user may ask about the document
-    and produce a set of ground truth answers to be used in validating a RAG system. 
-    Include a summary of the document in the queries. Return a json formatted list of 
+    and produce a set of ground truth answers to be used in validating a RAG system.
+    Include a summary of the document in the queries. Return a json formatted list of
     query-response pairs formatted as follows:
     {{
         'source': 'path/to/document',
@@ -287,7 +287,7 @@ Examples:
                 output_dir=args.output_dir,
                 num_samples=args.num_samples,
             )
-            print(f"✓ Successfully generated ground truth data")
+            print(f"✅ Successfully generated ground truth data")
             print(f"  Output: {args.output_dir}")
             usage = result["metadata"]["usage"]
             cost = result["metadata"]["cost"]
@@ -338,7 +338,7 @@ Examples:
                         r["metadata"]["cost"]["total_cost"] for r in results
                     ),
                 }
-                print(f"✓ Successfully processed {len(results)} files")
+                print(f"✅ Successfully processed {len(results)} files")
                 print(f"  Output: {args.output_dir}")
                 print(f"  Total QA pairs: {total_pairs}")
                 print(

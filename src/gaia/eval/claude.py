@@ -105,6 +105,13 @@ class ClaudeClient:
             # Calculate cost
             cost = self.calculate_cost(usage["input_tokens"], usage["output_tokens"])
 
+            self.log.info(
+                f"Usage: {usage['input_tokens']} input + {usage['output_tokens']} output = {usage['total_tokens']} total tokens"
+            )
+            self.log.info(
+                f"Cost: ${cost['input_cost']:.4f} input + ${cost['output_cost']:.4f} output = ${cost['total_cost']:.4f} total"
+            )
+
             return {"content": message.content, "usage": usage, "cost": cost}
         except Exception as e:
             self.log.error(f"Error getting completion with usage: {e}")

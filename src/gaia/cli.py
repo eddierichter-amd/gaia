@@ -907,7 +907,7 @@ Examples:
             )
 
             print(
-                f"✓ Successfully analyzed {result['models_analyzed']} evaluation files"
+                f"✅ Successfully analyzed {result['models_analyzed']} evaluation files"
             )
 
             if not args.summary_only:
@@ -1132,7 +1132,7 @@ Let me know your answer!
         except ImportError as e:
             log.error(f"Failed to import GroundTruthGenerator: {e}")
             print(
-                "❌ Error: Failed to import groundtruth module. Please ensure all dependencies are installed."
+                "Error: Failed to import groundtruth module. Please ensure all dependencies are installed."
             )
             return
 
@@ -1143,7 +1143,7 @@ Let me know your answer!
             )
         except Exception as e:
             log.error(f"Error initializing generator: {e}")
-            print(f"❌ Error initializing generator: {e}")
+            print(f"Error initializing generator: {e}")
             return
 
         # Load custom prompt if provided
@@ -1152,10 +1152,10 @@ Let me know your answer!
             try:
                 with open(args.custom_prompt, "r", encoding="utf-8") as f:
                     custom_prompt = f.read().strip()
-                print(f"✅ Using custom prompt from: {args.custom_prompt}")
+                print(f"Using custom prompt from: {args.custom_prompt}")
             except Exception as e:
                 log.error(f"Error loading custom prompt: {e}")
-                print(f"❌ Error loading custom prompt: {e}")
+                print(f"Error loading custom prompt: {e}")
                 return
 
         save_text = not args.no_save_text
@@ -1222,7 +1222,7 @@ Let me know your answer!
                             r["metadata"]["cost"]["total_cost"] for r in results
                         ),
                     }
-                    print(f"✓ Successfully processed {len(results)} files")
+                    print(f"✅ Successfully processed {len(results)} files")
                     print(f"  Output: {args.output_dir}")
                     print(f"  Total QA pairs: {total_pairs}")
                     print(
@@ -1272,9 +1272,7 @@ Let me know your answer!
             print(
                 "  Instructions: Fill in the 'response' fields with your RAG system outputs"
             )
-            print(
-                "  Then run: gaia-cli eval -f <template_file> to evaluate performance"
-            )
+            print("  Then run: gaia-cli eval <template_file> to evaluate performance")
 
         except Exception as e:
             log.error(f"Error creating template: {e}")
