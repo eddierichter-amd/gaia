@@ -4,22 +4,22 @@ Currently, the following capabilities are available, more will be added in the n
 
 | Use-Case Example   | Function                                 | Description                                                     |
 | ------------------ | ---------------------------------------- | --------------------------------------------------------------- |
-| LLM Direct         | Direct LLM queries via CLI               | Direct model interaction using the new `gaia-cli llm` command  |
+| LLM Direct         | Direct LLM queries via CLI               | Direct model interaction using the new `gaia llm` command  |
 | Blender Agent      | 3D content creation and manipulation     | Specialized agent for Blender automation and workflow          |
 
 ## LLM Direct Usage
 
-The `gaia-cli llm` command provides direct access to language models without requiring server setup. This is the simplest way to interact with AI models:
+The `gaia llm` command provides direct access to language models without requiring server setup. This is the simplest way to interact with AI models:
 
 ```bash
 # Basic query
-gaia-cli llm "What is 1+1?"
+gaia llm "What is 1+1?"
 
 # Specify model and token limit
-gaia-cli llm "Explain quantum computing" --model Llama-3.2-3B-Instruct-Hybrid --max-tokens 200
+gaia llm "Explain quantum computing" --model Llama-3.2-3B-Instruct-Hybrid --max-tokens 200
 
 # Disable streaming for batch processing
-gaia-cli llm "Write a short poem" --no-stream
+gaia llm "Write a short poem" --no-stream
 ```
 
 **Requirements**: Requires lemonade-server to be running. The command will provide helpful error messages if the server is not accessible.
@@ -30,16 +30,16 @@ The Blender agent provides specialized functionality for 3D content creation and
 
 ```bash
 # Run all Blender examples
-gaia-cli blender
+gaia blender
 
 # Interactive 3D scene creation
-gaia-cli blender --interactive
+gaia blender --interactive
 
 # Create specific objects with custom queries
-gaia-cli blender --query "Create a red cube and blue sphere"
+gaia blender --query "Create a red cube and blue sphere"
 
 # Run a specific example
-gaia-cli blender --example 2
+gaia blender --example 2
 ```
 
 **Key capabilities:**

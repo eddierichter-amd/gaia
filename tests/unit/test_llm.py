@@ -18,21 +18,19 @@ class TestLlmCli(unittest.TestCase):
         pass
 
     def _check_command_availability(self):
-        """Check if gaia-cli command is available."""
-        gaia_cli_path = shutil.which("gaia-cli")
+        """Check if gaia command is available."""
         gaia_path = shutil.which("gaia")
 
         print(f"Command availability check:")
-        print(f"  gaia-cli path: {gaia_cli_path}")
         print(f"  gaia path: {gaia_path}")
         print(f"  Current PATH: {os.environ.get('PATH', 'NOT_SET')}")
         print(f"  Current Python: {sys.executable}")
 
-        if not gaia_cli_path:
-            print("ERROR: gaia-cli command not found in PATH")
+        if not gaia_path:
+            print("ERROR: gaia command not found in PATH")
             return False
 
-        print("OK: gaia-cli command found")
+        print("OK: gaia command found")
         return True
 
     def _check_lemonade_server_health(self):
@@ -56,7 +54,7 @@ class TestLlmCli(unittest.TestCase):
 
         # Check command availability first
         if not self._check_command_availability():
-            self.fail("gaia-cli command is not available. Cannot run LLM tests.")
+            self.fail("gaia command is not available. Cannot run LLM tests.")
 
         # Check if server is accessible
         if not self._check_lemonade_server_health():
@@ -65,11 +63,11 @@ class TestLlmCli(unittest.TestCase):
             )
 
         try:
-            print("Executing command: gaia-cli llm 'What is 1+1?' --max-tokens 20")
+            print("Executing command: gaia llm 'What is 1+1?' --max-tokens 20")
 
             # Test the LLM command (assuming server is already running)
             result = subprocess.run(
-                ["gaia-cli", "llm", "What is 1+1?", "--max-tokens", "20"],
+                ["gaia", "llm", "What is 1+1?", "--max-tokens", "20"],
                 capture_output=True,
                 text=True,
                 timeout=60,

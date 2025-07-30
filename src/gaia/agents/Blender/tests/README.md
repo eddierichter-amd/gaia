@@ -60,13 +60,13 @@ The Blender agent is now integrated into the main CLI. To test the CLI integrati
 
 ```bash
 # Test Blender CLI command help
-gaia-cli blender --help
+gaia blender --help
 
 # Test a simple Blender example (requires MCP server running)
-gaia-cli blender --example 1
+gaia blender --example 1
 
 # Test interactive mode (requires MCP server running)
-gaia-cli blender --interactive
+gaia blender --interactive
 ```
 
 Note: CLI integration tests require both the Lemonade server and the Blender MCP server to be running. The CLI will automatically check for both servers and provide setup instructions if either is missing.

@@ -4,7 +4,7 @@ GAIA (Generative AI Acceleration Infrastructure & Applications) provides a comma
 
 ## GAIA-CLI Getting Started Guide
 
-1. Make sure to follow the [Getting Started Guide](../README.md#getting-started-guide) to install the `gaia-cli` tool.
+1. Make sure to follow the [Getting Started Guide](../README.md#getting-started-guide) to install the necessary `gaia` CLI and `lemonade` LLM serving tools.
 
 2. GAIA automatically configures optimal settings for Ryzen AI hardware.
 
@@ -14,15 +14,15 @@ GAIA (Generative AI Acceleration Infrastructure & Applications) provides a comma
    - Double-clicking the desktop shortcut, or
    - Running: `lemonade-server serve`
 
-5. Now try the direct LLM demo in the [GAIA-CLI LLM Demo](#gaia-cli-llm-demo) section, chat demo in the [GAIA-CLI Chat Demo](#gaia-cli-chat-demo) section, or talk demo in the [GAIA-CLI Talk Demo](#gaia-cli-talk-demo) section.
+5. Now try the direct LLM demo in the [GAIA CLI LLM Demo](#gaia-cli-llm-demo) section, chat demo in the [GAIA CLI Chat Demo](#gaia-cli-chat-demo) section, or talk demo in the [GAIA CLI Talk Demo](#gaia-cli-talk-demo) section.
 
-## GAIA-CLI LLM Demo
+## GAIA CLI LLM Demo
 
 The fastest way to interact with AI models is through the direct LLM command:
 
 1. Try a simple query:
    ```bash
-   gaia-cli llm "What is 1+1?"
+   gaia llm "What is 1+1?"
    ```
 
    This will stream the response directly to your terminal. The system will automatically check for the lemonade server and provide helpful error messages if it's not running.
@@ -30,10 +30,10 @@ The fastest way to interact with AI models is through the direct LLM command:
 2. Use advanced options:
    ```bash
    # Specify model and token limit
-   gaia-cli llm "Explain quantum computing in simple terms" --model llama3.2:3b --max-tokens 200
+   gaia llm "Explain quantum computing in simple terms" --model llama3.2:3b --max-tokens 200
 
    # Disable streaming for batch processing
-   gaia-cli llm "Write a short poem about AI" --no-stream
+   gaia llm "Write a short poem about AI" --no-stream
    ```
 
 3. If you get a connection error, make sure the lemonade server is running:
@@ -41,13 +41,13 @@ The fastest way to interact with AI models is through the direct LLM command:
    lemonade-server serve
    ```
 
-## GAIA-CLI Chat Demo
+## GAIA CLI Chat Demo
 
 1. Make sure the Lemonade server is running (see [Getting Started Guide](#gaia-cli-getting-started-guide)).
 
 2. Begin a chat session by running:
    ```bash
-   gaia-cli chat
+   gaia chat
    ```
    This opens an interactive chat interface where you can converse with the AI.
 
@@ -62,7 +62,7 @@ The fastest way to interact with AI models is through the direct LLM command:
    Chat session ended.
    ```
 
-## GAIA-CLI Talk Demo
+## GAIA CLI Talk Demo
 
 For voice-based interaction with AI models, see the [Voice Interaction Guide](./talk.md).
 
@@ -71,7 +71,7 @@ For voice-based interaction with AI models, see the [Voice Interaction Guide](./
 The CLI supports the following core commands:
 
 ```bash
-gaia-cli --help
+gaia --help
 ```
 
 ### Available Commands
@@ -80,12 +80,19 @@ gaia-cli --help
 - **`prompt`**: Send a single message to an agent and get a response
 - **`chat`**: Start an interactive text chat session with message history
 - **`talk`**: Start a voice-based conversation session
-- **`blender`**: Create and modify 3D scenes using the Blender agent
+- **`blender`**: Create and modify 3D scenes using the Blender agent (see [Blender Guide](./blender.md))
 - **`stats`**: View model performance statistics from the most recent run
 - **`test`**: Run various audio/speech tests for development and troubleshooting
 - **`youtube`**: YouTube utilities for transcript downloading
 - **`kill`**: Kill a process running on a specific port
-- **`groundtruth`**: Generate ground truth data for RAG evaluation
+- **Evaluation commands**: See the [Evaluation Guide](./eval.md) for comprehensive documentation of:
+  - `groundtruth`: Generate ground truth data for various evaluation use cases
+  - `create-template`: Create evaluation template files from ground truth data
+  - `eval`: Evaluate RAG system performance using results data
+  - `report`: Generate summary reports from evaluation results
+  - `generate`: Generate synthetic test data (meeting transcripts or business emails)
+  - `batch-experiment`: Run systematic experiments with different LLM configurations
+  - `visualize`: Launch web-based evaluation results visualizer for interactive comparison
 
 ### Global Options
 
@@ -98,7 +105,7 @@ All commands support these global options:
 The `llm` command provides direct access to language models:
 
 ```bash
-gaia-cli llm QUERY [OPTIONS]
+gaia llm QUERY [OPTIONS]
 ```
 
 **Available options:**
@@ -109,13 +116,13 @@ gaia-cli llm QUERY [OPTIONS]
 **Examples:**
 ```bash
 # Basic query with streaming
-gaia-cli llm "What is machine learning?"
+gaia llm "What is machine learning?"
 
 # Use specific model with token limit
-gaia-cli llm "Explain neural networks" --model llama3.2:3b --max-tokens 300
+gaia llm "Explain neural networks" --model llama3.2:3b --max-tokens 300
 
 # Disable streaming for batch processing
-gaia-cli llm "Generate a Python function to sort a list" --no-stream
+gaia llm "Generate a Python function to sort a list" --no-stream
 ```
 
 **Requirements**: The lemonade server must be running. If not available, the command will provide clear instructions on how to start it.
@@ -125,7 +132,7 @@ gaia-cli llm "Generate a Python function to sort a list" --no-stream
 Send a single prompt to a GAIA agent:
 
 ```bash
-gaia-cli prompt "MESSAGE" [OPTIONS]
+gaia prompt "MESSAGE" [OPTIONS]
 ```
 
 **Available options:**
@@ -139,13 +146,13 @@ gaia-cli prompt "MESSAGE" [OPTIONS]
 **Examples:**
 ```bash
 # Basic prompt
-gaia-cli prompt "What is the weather like today?"
+gaia prompt "What is the weather like today?"
 
 # Use a specific agent with stats
-gaia-cli prompt "Create a 3D cube" --agent-name Blender --stats
+gaia prompt "Create a 3D cube" --agent-name Blender --stats
 
 # Use different model and token limit
-gaia-cli prompt "Write a story" --model llama3.2:3b --max-new-tokens 1000
+gaia prompt "Write a story" --model llama3.2:3b --max-new-tokens 1000
 ```
 
 ## Chat Command
@@ -153,7 +160,7 @@ gaia-cli prompt "Write a story" --model llama3.2:3b --max-new-tokens 1000
 Start an interactive text conversation:
 
 ```bash
-gaia-cli chat [OPTIONS]
+gaia chat [OPTIONS]
 ```
 
 **Available options:**
@@ -166,21 +173,22 @@ gaia-cli chat [OPTIONS]
 **Example:**
 ```bash
 # Start chat with default agent
-gaia-cli chat
-
-# Start chat with Blender agent
-gaia-cli chat --agent-name Blender
+gaia chat
 
 # Use different model
-gaia-cli chat --model llama3.2:3b
+gaia chat --model llama3.2:3b
 ```
+
+**Chat Commands:**
+- Type `stop` to quit the chat session
+- Type `restart` to clear chat history (functionality coming soon)
 
 ## Talk Command
 
 Start a voice-based conversation:
 
 ```bash
-gaia-cli talk [OPTIONS]
+gaia talk [OPTIONS]
 ```
 
 **Available options:**
@@ -197,133 +205,112 @@ For detailed voice interaction instructions, see the [Voice Interaction Guide](.
 
 ## Blender Command
 
-Create and modify 3D scenes using the Blender agent:
+For comprehensive documentation of GAIA's Blender agent including 3D scene creation, interactive modeling, and natural language 3D workflows, see the **[Blender Guide](./blender.md)**.
 
+The Blender agent provides:
+- **Natural Language 3D Modeling**: Create and modify 3D scenes through conversational commands
+- **Interactive Planning**: Multi-step scene creation with automatic task breakdown
+- **Object Management**: Create, position, scale, and apply materials to 3D objects
+- **Scene Organization**: Clear scenes, manage hierarchies, and organize complex layouts
+- **MCP Integration**: Direct communication with Blender through Model Context Protocol
+
+Quick examples:
 ```bash
-gaia-cli blender [OPTIONS]
+# Run interactive Blender mode
+gaia blender --interactive
+
+# Create specific 3D objects
+gaia blender --query "Create a red cube and blue sphere arranged in a line"
+
+# Run built-in examples
+gaia blender --example 2
 ```
-
-**Available options:**
-- `--model`: Model ID to use (default: "Llama-3.2-3B-Instruct-Hybrid")
-- `--example`: Run a specific example (1-6), if not specified run interactive mode
-- `--steps`: Maximum number of steps per query (default: 5)
-- `--output-dir`: Directory to save output files (default: "output")
-- `--stream`: Enable streaming mode for LLM responses
-- `--stats`: Display performance statistics (default: True)
-- `--query`: Custom query to run instead of examples
-- `--interactive`: Enable interactive mode to continuously input queries
-- `--debug-prompts`: Enable debug prompts (default: False)
-- `--print-result`: Print results to console (default: False)
-- `--mcp-port`: Port for the Blender MCP server (default: 9876)
-
-**Available examples:**
-1. **Clearing the scene** - Remove all objects from the scene
-2. **Creating a basic cube** - Create a red cube at the center
-3. **Creating a sphere with specific properties** - Blue sphere with custom position and scale
-4. **Creating multiple objects** - Green cube and red sphere arrangement
-5. **Creating and modifying objects** - Create and then modify a blue cylinder
-
-**Examples:**
-```bash
-# Run all Blender examples in sequence
-gaia-cli blender
-
-# Run a specific example
-gaia-cli blender --example 2
-
-# Interactive Blender mode for custom 3D scene creation
-gaia-cli blender --interactive
-
-# Custom query to create specific 3D objects
-gaia-cli blender --query "Create a red cube and blue sphere arranged in a line"
-
-# Custom query with advanced scene setup
-gaia-cli blender --query "Clear the scene, then create a green cylinder at (0,0,0) and a yellow cone 3 units above it"
-
-# Enable debug mode with custom output directory
-gaia-cli blender --interactive --debug-prompts --output-dir ./blender_results
-
-# Use different model with streaming enabled
-gaia-cli blender --model "custom-model" --stream --query "Create a complex 3D scene with multiple colored objects"
-
-# Use custom MCP port
-gaia-cli blender --mcp-port 9877 --query "Create a red cube"
-```
-
-**Blender Agent Capabilities:**
-- **Scene Management**: Clear scenes, get scene information
-- **Object Creation**: Create cubes, spheres, cylinders, cones, and torus objects
-- **Material Assignment**: Set RGBA colors and materials for objects
-- **Object Modification**: Modify position, rotation, and scale of existing objects
-- **Interactive Planning**: Multi-step scene creation with automatic planning
-
-**Requirements:**
-- **Blender agent dependencies**: Must be installed for the command to be available
-- **Lemonade server**: Must be running for AI processing (same as other CLI commands)
-- **Blender MCP server**: Must be running for 3D scene communication
-
-**MCP Server Setup:**
-1. Open Blender (version 4.3+ recommended)
-2. Go to `Edit > Preferences > Add-ons`
-3. Click the down arrow button, then `Install...`
-4. Navigate to: `src/gaia/mcp/blender_mcp_server.py`
-5. Install and enable the `Simple Blender MCP` add-on
-6. Open the 3D viewport sidebar (press `N` key if not visible)
-7. Find the `Blender MCP` panel in the sidebar
-8. Set port to `9876` and click `Start Server` (use `--mcp-port` to customize)
-
-For detailed setup instructions with screenshots, see: `workshop/blender.ipynb`
-
-**Note**: If either server is not running, you'll receive clear error messages with setup instructions.
 
 ## Stats Command
 
 View performance statistics from the most recent model run:
 
 ```bash
-gaia-cli stats [OPTIONS]
+gaia stats [OPTIONS]
 ```
 
 **Available options:**
 - `--host`: Host address for the LLM server (default: "127.0.0.1")
 
-## Groundtruth Command
+## Evaluation Commands
 
-Generate ground truth data for RAG evaluation using Claude:
+For comprehensive documentation of GAIA's evaluation system including systematic testing, benchmarking, and model comparison capabilities, see the **[Evaluation Guide](./eval.md)**.
 
+The evaluation system provides tools for:
+- **Ground Truth Generation**: Create standardized test datasets using Claude AI
+- **Automated Evaluation**: Perform semantic evaluation with detailed reporting
+- **Batch Experimentation**: Run systematic experiments across multiple models
+- **Performance Analysis**: Generate comprehensive comparison reports
+- **Transcript Testing**: Create realistic test data for transcript processing
+
+Quick examples:
 ```bash
-gaia-cli groundtruth (-f FILE | -d DIRECTORY) [OPTIONS]
+# Generate evaluation data from documents
+gaia groundtruth -f ./data/document.html
+
+# Run systematic experiments across models
+gaia batch-experiment --create-sample-config experiments.json
+gaia batch-experiment -c experiments.json -i ./data -o ./results
+
+# Evaluate and report results
+gaia eval -f ./results/experiment.json
+gaia report -d ./eval_results
+
+# Launch interactive visualizer for results comparison
+gaia visualize
 ```
 
-**Required arguments (mutually exclusive):**
-- `-f, --file`: Path to a single document file to process
-- `-d, --directory`: Directory containing documents to process
+## Visualize Command
+
+Launch an interactive web-based visualizer for comparing evaluation results:
+
+```bash
+gaia visualize [OPTIONS]
+```
 
 **Available options:**
-- `-o, --output-dir`: Output directory for generated ground truth files (default: ./output/groundtruth)
-- `-p, --pattern`: File pattern to match when processing directory (default: *.html)
-- `-m, --model`: Claude model to use (default: claude-sonnet-4-20250514)
-- `--max-tokens`: Maximum tokens for Claude responses (default: 4096)
-- `--no-save-text`: Don't save extracted text for HTML files
-- `--custom-prompt`: Path to a file containing a custom prompt for Claude
-- `--num-samples`: Number of Q&A pairs to generate per document (default: 5)
+- `--port`: Port to run the visualizer server on (default: 3000)
+- `--experiments-dir`: Directory containing experiment JSON files (default: ./experiments)
+- `--evaluations-dir`: Directory containing evaluation JSON files (default: ./evaluation)
+- `--workspace`: Base workspace directory (default: current directory)
+- `--no-browser`: Don't automatically open browser after starting server
+- `--host`: Host address for the visualizer server (default: localhost)
 
 **Examples:**
 ```bash
-# Process a single file
-gaia-cli groundtruth -f ./data/html/blender/introduction.html
+# Launch visualizer with default settings
+gaia visualize
 
-# Process all HTML files in a directory
-gaia-cli groundtruth -d ./data/html/blender
+# Launch with custom data directories
+gaia visualize --experiments-dir ./my_experiments --evaluations-dir ./my_evaluations
 
-# Process with custom output directory and more Q&A pairs
-gaia-cli groundtruth -f ./data/html/intro.html -o ./output/gt --num-samples 10
+# Launch on custom port without opening browser
+gaia visualize --port 8080 --no-browser
 
-# Process PDFs with custom pattern
-gaia-cli groundtruth -d ./data -p "*.pdf" -o ./output/gt
+# Launch with specific workspace directory
+gaia visualize --workspace ./evaluation_workspace
+```
 
-# Use custom Claude model
-gaia-cli groundtruth -f ./data/doc.html -m claude-3-opus-20240229
+**Features:**
+- **Interactive Comparison**: Side-by-side comparison of multiple experiment results
+- **Key Metrics Dashboard**: View costs, token usage, quality scores, and performance metrics
+- **Quality Analysis**: Detailed breakdown of evaluation criteria and ratings
+- **Real-time Updates**: Automatic discovery of new files in data directories
+- **Responsive Design**: Works on desktop and mobile devices
+
+**Requirements**: Node.js must be installed on your system. The command will automatically install webapp dependencies on first run.
+
+**Workflow Integration:**
+```bash
+# Complete evaluation workflow with visualization
+gaia batch-experiment -c config.json -i ./data -o ./experiments
+gaia eval -d ./experiments -o ./evaluation
+gaia visualize --experiments-dir ./experiments --evaluations-dir ./evaluation
 ```
 
 ## Test Commands
@@ -331,7 +318,7 @@ gaia-cli groundtruth -f ./data/doc.html -m claude-3-opus-20240229
 Run various tests for development and troubleshooting:
 
 ```bash
-gaia-cli test --test-type TYPE [OPTIONS]
+gaia test --test-type TYPE [OPTIONS]
 ```
 
 ### Text-to-Speech (TTS) Tests
@@ -348,13 +335,13 @@ gaia-cli test --test-type TYPE [OPTIONS]
 **Examples:**
 ```bash
 # Test TTS preprocessing with custom text
-gaia-cli test --test-type tts-preprocessing --test-text "Hello, world!"
+gaia test --test-type tts-preprocessing --test-text "Hello, world!"
 
 # Test TTS streaming
-gaia-cli test --test-type tts-streaming --test-text "Testing streaming playback"
+gaia test --test-type tts-streaming --test-text "Testing streaming playback"
 
 # Generate audio file
-gaia-cli test --test-type tts-audio-file --test-text "Save this as audio" --output-audio-file speech.wav
+gaia test --test-type tts-audio-file --test-text "Save this as audio" --output-audio-file speech.wav
 ```
 
 ### Automatic Speech Recognition (ASR) Tests
@@ -373,13 +360,13 @@ gaia-cli test --test-type tts-audio-file --test-text "Save this as audio" --outp
 **Examples:**
 ```bash
 # Test file transcription
-gaia-cli test --test-type asr-file-transcription --input-audio-file ./data/audio/test.m4a
+gaia test --test-type asr-file-transcription --input-audio-file ./data/audio/test.m4a
 
 # Test microphone for 30 seconds
-gaia-cli test --test-type asr-microphone --recording-duration 30
+gaia test --test-type asr-microphone --recording-duration 30
 
 # List audio devices
-gaia-cli test --test-type asr-list-audio-devices
+gaia test --test-type asr-list-audio-devices
 ```
 
 ## YouTube Utilities
@@ -387,7 +374,7 @@ gaia-cli test --test-type asr-list-audio-devices
 Download transcripts from YouTube videos:
 
 ```bash
-gaia-cli youtube --download-transcript URL [--output-path PATH]
+gaia youtube --download-transcript URL [--output-path PATH]
 ```
 
 **Available options:**
@@ -397,7 +384,7 @@ gaia-cli youtube --download-transcript URL [--output-path PATH]
 **Example:**
 ```bash
 # Download YouTube transcript
-gaia-cli youtube --download-transcript "https://youtube.com/watch?v=..." --output-path transcript.txt
+gaia youtube --download-transcript "https://youtube.com/watch?v=..." --output-path transcript.txt
 ```
 
 ## Kill Command
@@ -405,7 +392,7 @@ gaia-cli youtube --download-transcript "https://youtube.com/watch?v=..." --outpu
 Terminate processes running on specific ports:
 
 ```bash
-gaia-cli kill --port PORT_NUMBER
+gaia kill --port PORT_NUMBER
 ```
 
 **Required options:**
@@ -414,10 +401,10 @@ gaia-cli kill --port PORT_NUMBER
 **Examples:**
 ```bash
 # Kill process running on port 8000
-gaia-cli kill --port 8000
+gaia kill --port 8000
 
 # Kill process running on port 8001
-gaia-cli kill --port 8001
+gaia kill --port 8001
 ```
 
 This is useful for cleaning up lingering server processes. The command will:
@@ -445,7 +432,7 @@ lemonade-server serve
 - Verify your Hugging Face token if prompted
 
 **Audio Issues:**
-- Use `gaia-cli test --test-type asr-list-audio-devices` to check available devices
+- Use `gaia test --test-type asr-list-audio-devices` to check available devices
 - Verify your microphone permissions in Windows settings
 - Try different audio device indices if the default doesn't work
 

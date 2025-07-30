@@ -34,11 +34,11 @@ The following is a list of currently supported LLMs on Ryzen AI NPU, more will b
 1. Install NPU dependencies:
     1. For NPU, run: `lemonade-install --ryzenai npu -y --token $env:OGA_TOKEN`
     1. ⚠️ NOTE: Make sure you are in the correct virtual environment when installing dependencies. If not, run `conda activate gaiaenv`.
-1. Run `gaia-cli -v` in the terminal to verify the installation. You should see a similar output:
+1. Run `gaia -v` in the terminal to verify the installation. You should see a similar output:
     ```bash
     amd/v0.7.1+cda0f5d5
     ```
-    1. Run `gaia` to start the GAIA-UI or `gaia-cli -h` to see CLI options.
+    1. Run `gaia -h` to see CLI options.
 1. Report any issues to the GAIA team at `gaia@amd.com` or create an [issue](https://github.com/aigdat/gaia/issues) on the [GAIA GitHub repo](https://github.com/aigdat/gaia.git).
 
 ## License

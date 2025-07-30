@@ -76,28 +76,28 @@ The groundtruth generator is integrated into the main Gaia CLI:
 
 ```bash
 # Process a single file
-gaia-cli groundtruth -f ./data/html/blender/introduction.html
+gaia groundtruth -f ./data/html/blender/introduction.html
 
 # Process all HTML files in a directory
-gaia-cli groundtruth -d ./data/html/blender
+gaia groundtruth -d ./data/html/blender
 
 # Process with custom output directory
-gaia-cli groundtruth -f ./data/html/intro.html -o ./output/gt
+gaia groundtruth -f ./data/html/intro.html -o ./output/gt
 
 # Process with custom file pattern (e.g., PDFs)
-gaia-cli groundtruth -d ./data -p "*.pdf" -o ./output/gt
+gaia groundtruth -d ./data -p "*.pdf" -o ./output/gt
 
 # Use custom Claude model
-gaia-cli groundtruth -f ./data/doc.html -m claude-3-opus-20240229
+gaia groundtruth -f ./data/doc.html -m claude-3-opus-20240229
 
 # Use custom prompt from file
-gaia-cli groundtruth -f ./data/doc.html --custom-prompt ./prompts/my_prompt.txt
+gaia groundtruth -f ./data/doc.html --custom-prompt ./prompts/my_prompt.txt
 
 # Process without saving extracted text
-gaia-cli groundtruth -f ./data/doc.html --no-save-text
+gaia groundtruth -f ./data/doc.html --no-save-text
 
 # Generate 10 Q&A pairs per document
-gaia-cli groundtruth -d ./data/html/blender --num-samples 10
+gaia groundtruth -d ./data/html/blender --num-samples 10
 ```
 
 **Command Line Options:**
@@ -149,13 +149,13 @@ For manual testing, you can create a template file that structures the ground tr
 
 ```bash
 # Create template from ground truth file
-gaia-cli create-template -f ./output/groundtruth/introduction.groundtruth.json
+gaia create-template -f ./output/groundtruth/introduction.groundtruth.json
 
 # Create template with custom output directory
-gaia-cli create-template -f ./output/groundtruth/doc.groundtruth.json -o ./templates/
+gaia create-template -f ./output/groundtruth/doc.groundtruth.json -o ./templates/
 
 # Create template with custom similarity threshold
-gaia-cli create-template -f ./output/groundtruth/doc.groundtruth.json --threshold 0.8
+gaia create-template -f ./output/groundtruth/doc.groundtruth.json --threshold 0.8
 ```
 
 This creates a template file with placeholder responses that you can manually fill in:
@@ -166,7 +166,7 @@ This creates a template file with placeholder responses that you can manually fi
     "test_file": "path/to/groundtruth.json",
     "timestamp": "2025-01-XX XX:XX:XX",
     "similarity_threshold": 0.7,
-    "instructions": "Fill in the 'response' fields with your RAG system outputs, then evaluate using gaia-cli eval"
+    "instructions": "Fill in the 'response' fields with your RAG system outputs, then evaluate using gaia eval"
   },
   "analysis": {
     "qa_results": [
@@ -187,7 +187,7 @@ This creates a template file with placeholder responses that you can manually fi
 Test your RAG system against the generated ground truth data. You can either:
 
 **Option A: Use the template (for manual testing)**
-1. Use `gaia-cli create-template` to generate a template file
+1. Use `gaia create-template` to generate a template file
 2. Fill in the `response` fields with your RAG system outputs
 3. Proceed to evaluation
 
@@ -223,16 +223,16 @@ Analyze your RAG system's performance using the CLI:
 
 ```bash
 # Evaluate RAG results file
-gaia-cli eval -f ./output/templates/introduction.template.json
+gaia eval -f ./output/templates/introduction.template.json
 
 # Evaluate with custom output directory
-gaia-cli eval -f ./output/rag/results.json -o ./output/eval
+gaia eval -f ./output/rag/results.json -o ./output/eval
 
 # Evaluate with specific Claude model
-gaia-cli eval -f ./output/rag/results.json -m claude-3-opus-20240229
+gaia eval -f ./output/rag/results.json -m claude-3-opus-20240229
 
 # Evaluate and display summary only (no detailed report file)
-gaia-cli eval -f ./output/rag/results.json --summary-only
+gaia eval -f ./output/rag/results.json --summary-only
 ```
 
 **Command Line Options:**
@@ -273,21 +273,21 @@ print("Total Cost:", f"${evaluation_data['total_cost']['total_cost']:.4f}")
 print("Cost per Question:", f"${evaluation_data['total_cost']['total_cost']/len(evaluation_data['per_question']):.4f}")
 ```
 
-### 5. Generate Summary Report (New!)
+### 5. Generate Summary Report
 
 After evaluating multiple models, generate a comprehensive comparison report:
 
-#### Command Line Interface (Recommended)
+### Command Line Interface
 
 ```bash
 # Generate report from evaluation directory
-gaia-cli report -d ./output/eval
+gaia report -d ./output/eval
 
 # Generate report with custom output filename
-gaia-cli report -d ./output/eval -o Model_Performance_Analysis.md
+gaia report -d ./output/eval -o Model_Performance_Analysis.md
 
 # Generate report and display summary only (no file output)
-gaia-cli report -d ./output/eval --summary-only
+gaia report -d ./output/eval --summary-only
 ```
 
 **Command Line Options:**
@@ -382,10 +382,10 @@ The system uses sophisticated evaluation criteria combining quantitative and qua
 2. **Generate Ground Truth**
    ```bash
    # Using Gaia CLI (recommended) - generates 5 Q&A pairs per document by default
-   gaia-cli groundtruth -d ./data/html/blender -o ./output/groundtruth
+   gaia groundtruth -d ./data/html/blender -o ./output/groundtruth
 
    # Generate 10 Q&A pairs per document
-   gaia-cli groundtruth -d ./data/html/blender -o ./output/groundtruth --num-samples 10
+   gaia groundtruth -d ./data/html/blender -o ./output/groundtruth --num-samples 10
 
    # Or using standalone module
    # python -m gaia.eval.groundtruth -d ./data/html/blender -o ./output/groundtruth --num-samples 10
@@ -398,7 +398,7 @@ The system uses sophisticated evaluation criteria combining quantitative and qua
 3. **Create Template (For Manual Testing)**
    ```bash
    # Create template file for manual response entry
-   gaia-cli create-template -f ./output/groundtruth/introduction.groundtruth.json -o ./output/templates
+   gaia create-template -f ./output/groundtruth/introduction.groundtruth.json -o ./output/templates
    ```
 
 4. **Test RAG System**
@@ -414,7 +414,7 @@ The system uses sophisticated evaluation criteria combining quantitative and qua
 5. **Evaluate Performance**
    ```bash
    # Using Gaia CLI (recommended)
-   gaia-cli eval -f ./output/templates/introduction.template.json -o ./output/eval
+   gaia eval -f ./output/templates/introduction.template.json -o ./output/eval
 
    # Or using Python API
    # evaluator = RagEvaluator()
@@ -424,7 +424,7 @@ The system uses sophisticated evaluation criteria combining quantitative and qua
 6. **Generate Summary Report (New!)**
    ```bash
    # Generate comprehensive comparison report after evaluating multiple models
-   gaia-cli report -d ./output/eval
+   gaia report -d ./output/eval
 
    # Or using Python API
    # evaluator = RagEvaluator()
@@ -457,25 +457,25 @@ Get detailed usage information:
 
 ```bash
 # Show help and all available options for groundtruth
-gaia-cli groundtruth --help
+gaia groundtruth --help
 
 # Show help for template creation
-gaia-cli create-template --help
+gaia create-template --help
 
 # Show help for evaluation
-gaia-cli eval --help
+gaia eval --help
 
 # Show help for summary reporting
-gaia-cli report --help
+gaia report --help
 
 # Show help for all Gaia CLI commands
-gaia-cli --help
+gaia --help
 
 # Examples are included in the help output
-gaia-cli groundtruth -h
-gaia-cli create-template -h
-gaia-cli eval -h
-gaia-cli report -h
+gaia groundtruth -h
+gaia create-template -h
+gaia eval -h
+gaia report -h
 ```
 
 ## Troubleshooting
@@ -487,7 +487,7 @@ gaia-cli report -h
 3. **JSON Structure**: Verify RAG results match expected format
 4. **Token Limits**: Use appropriate max_tokens for your model
 5. **File Permissions**: Ensure read access to input files and write access to output directory
-6. **Module Import**: Use `gaia-cli groundtruth` (recommended) or run from project root: `python -m gaia.eval.groundtruth`
+6. **Module Import**: Use `gaia groundtruth` (recommended) or run from project root: `python -m gaia.eval.groundtruth`
 
 **Template Issues:**
 7. **Empty Template**: Ensure ground truth file contains QA pairs in the expected format

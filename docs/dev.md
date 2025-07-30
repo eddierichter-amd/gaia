@@ -71,11 +71,11 @@ GAIA utilizes both NPU and iGPU on Ryzen AI systems for optimal performance on 3
 
 Once the installation and environment variables are set, run the following:
 
-1. Run `gaia-cli -v` in the terminal to verify the installation. You should see a similar output:
+1. Run `gaia -v` in the terminal to verify the installation. You should see a similar output:
     ```bash
     amd/v0.7.1+cda0f5d5
     ```
-1. Run `gaia` to start the GAIA-UI or `gaia-cli -h` to see CLI options.
+1. Run `gaia -h` to see CLI options.
 
 # Troubleshooting
 

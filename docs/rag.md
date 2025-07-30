@@ -11,7 +11,7 @@ The RAG (Retrieval-Augmented Generation) agent is a specialized AI assistant tha
 First, start the RAG agent server with an input file:
 
 ```bash
-gaia-cli start --agent-name Rag --input-file ./data/html/blender/introduction.html
+gaia start --agent-name Rag --input-file ./data/html/blender/introduction.html
 ```
 
 Additional options you can use:
@@ -23,7 +23,7 @@ Additional options you can use:
 
 Example with additional options:
 ```bash
-gaia-cli start --agent-name Rag \
+gaia start --agent-name Rag \
     --input-file ./data/html/blender/introduction.html \
     --model llama3.2:1b \
     --max-new-tokens 512 \
@@ -40,7 +40,7 @@ You can interact with the RAG agent in two ways:
 
 #### Text-based Chat
 ```bash
-gaia-cli chat
+gaia chat
 ```
 This opens an interactive chat interface where you can:
 - Type your questions and press Enter to send
@@ -58,7 +58,7 @@ Chat session ended.
 
 #### Voice-based Chat
 ```bash
-gaia-cli talk
+gaia talk
 ```
 This enables voice interaction where you can:
 - Speak your questions naturally
@@ -75,7 +75,7 @@ Voice chat options:
 
 When you're done, stop the RAG agent server:
 ```bash
-gaia-cli stop
+gaia stop
 ```
 
 ## How the RAG Agent Works
@@ -126,5 +126,5 @@ gaia-cli stop
 
 3. **Server Issues**:
    - Check if required ports (8000, 8001) are available
-   - Use `gaia-cli kill --port PORT` to clear stuck processes
+   - Use `gaia kill --port PORT` to clear stuck processes
    - Review logs in `gaia.cli.log` for detailed error information

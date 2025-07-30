@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gaia Evaluation Results Visualizer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Gaia Evaluation Results Visualizer</h1>
+            <p>Compare and analyze experiment and evaluation results</p>
+        </header>
+
+        <div class="controls">
+            <div class="file-selector">
+                <h3>Available Reports</h3>
+                <div class="file-lists">
+                    <div class="experiments-list">
+                        <h4>Experiments</h4>
+                        <select id="experimentSelect" multiple size="6">
+                            <option disabled>Loading experiments...</option>
+                        </select>
+                    </div>
+                    <div class="evaluations-list">
+                        <h4>Evaluations</h4>
+                        <select id="evaluationSelect" multiple size="6">
+                            <option disabled>Loading evaluations...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button id="addReportBtn" class="btn-primary">Add Report</button>
+                    <button id="compareBtn" class="btn-secondary">Compare Selected</button>
+                    <button id="clearBtn" class="btn-secondary">Clear All</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="reports-container">
+            <div id="reportsGrid" class="reports-grid">
+                <div class="empty-state">
+                    <h3>No reports loaded</h3>
+                    <p>Select experiment and/or evaluation files to visualize results</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html> 

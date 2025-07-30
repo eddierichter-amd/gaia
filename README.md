@@ -20,7 +20,7 @@
 **Currently supports Windows 11 Home/Pro**
 
 - 🏠 **Local LLM Processing**: Easily run powerful language models directly on your Windows device without cloud dependencies
-- ⚡ **Direct LLM Access**: Query models instantly with the new `gaia-cli llm` command - no server setup required
+- ⚡ **Direct LLM Access**: Query models instantly with the new `gaia llm` command - no server setup required
 - 🎯 **Specialized Agents**: Includes Blender agent for 3D content creation and workflow automation
 - ⚡ **Optimized Performance**: Leverages the AMD NPU and iGPU for hybrid acceleration to get fast and efficient AI processing
 - 🖥️ **Easy-to-Use Interface**: Provides both a command-line interface (CLI) and a graphical user interface (GUI) option for easy interaction with models and agents
@@ -71,43 +71,70 @@ For more details and setup instructions, see the [UI Documentation](docs/ui.md).
 
 # Getting Started Guide
 
-The quickest way to get started with GAIA is by using our unified installer that supports all modes:
+## Prerequisites
 
-**gaia-windows-setup.exe**: A single installer that supports all three installation modes:
-- **Hybrid Mode**: Offers best performance with NPU+iGPU on Ryzen AI processors, recommended option.
-- **NPU Mode**: Optimized for power efficiency on Ryzen AI processors *(coming soon)*
-- **Generic Mode**: Works on any Windows PC, using Ollama as the backend
+**System Requirements:**
+- **Windows 11 Home/Pro** (macOS and Linux not supported)
+- **16GB RAM minimum** (32GB recommended)
+- **AMD Ryzen processor** (any generation)
 
-The installer includes both a CLI tool and a GUI. The installation process typically takes about 5-10 minutes, depending on your Wi-Fi connection, and provides everything you need to start working with LLMs.
+**Performance Tiers:**
+- **🚀 Hybrid Mode** (NPU + iGPU): Requires AMD Ryzen AI 9 HX 300 series or newer
+- **⚡ Vulkan Mode**: Older Ryzen processors use llama.cpp with Vulkan acceleration via Lemonade
+- **🔧 CPU Mode**: Fallback for any system without GPU acceleration
 
-⚠️ **NOTE**: When running GAIA using the Hybrid mode, please make sure to disable any discrete third-party GPUs in Device Manager.
-
-## Installation Steps
+## Installation
 
 ![image](./data/img/gaia-setup.png)
 
-To install the GAIA application, please follow these steps:
-1. Make sure you meet the minimum [system requirements](#system-requirements) - **For Hybrid mode, you must have AMD Ryzen AI 9 HX 300 or newer processor**
-1. Download the [latest release](https://github.com/amd/gaia/releases) of the GAIA installer from the "Assets" section
-1. Unzip the downloaded file and run the installer by double-clicking the .exe file.
+**Quick Install:**
+1. Download the [latest release](https://github.com/amd/gaia/releases) installer from the "Assets" section
+2. Unzip and double-click `gaia-windows-setup.exe`
 
-   ⚠️ **NOTE**: If you get a Windows Security warning, you can verify the application by clicking *"More info"* and then *"Run anyway"*. This warning appears because the application is not digitally signed.
+   ⚠️ **NOTE**: If Windows shows a security warning, click *"More info"* then *"Run anyway"*
 
-   ⚠️ **NOTE**: The installer will attempt to write to the same directory by default and may overwrite a previous installation of GAIA. Change the target directory if you want to avoid this.
+3. Follow the installer prompts (5-10 minutes depending on internet speed)
+4. The installer includes:
+   - GAIA CLI and GUI applications
+   - Lemonade LLM server (handles all model acceleration automatically)
+   - Required models and dependencies
 
-1. Follow the on-screen instructions to complete the installation:
-   1. Choose your installation mode based on your hardware:
-      - **Hybrid Mode**: Best performance, requires Ryzen AI processor
-      - **NPU Mode**: Power-efficient, requires Ryzen AI processor *(coming soon)*
-      - **Generic Mode**: Compatible with any PC
-   1. The installer will automatically detect your CPU and only enable compatible modes
-   1. The process takes about 5-10 minutes depending on your Wi-Fi connection
+## Verify Installation
 
-1. Once installation is complete, two desktop icons will be created.
-   1. GAIA-CLI - Double click this icon to launch the CLI tool.
-   1. GAIA-GUI - Double click this icon to launch the GUI tool.
+Once installation completes, verify everything works:
 
-### Command-line Installation
+1. Double-click the **GAIA-CLI** desktop icon
+2. In the command prompt, run:
+   ```bash
+   gaia -v
+   ```
+3. You should see the GAIA version number displayed
+
+## Your First GAIA Experience
+
+**Option 1: Quick Chat (Recommended)**
+```bash
+gaia chat
+```
+Start an interactive conversation with the AI assistant.
+
+**Option 2: Voice Conversation**
+```bash
+gaia talk
+```
+Have a voice-based conversation with AI (includes speech recognition and text-to-speech).
+
+**Option 3: Web Interface**
+Double-click the **GAIA-GUI** desktop icon to launch the modern web interface in your browser.
+
+**Option 4: Direct Questions**
+```bash
+gaia llm "What can you help me with?"
+```
+
+The first time you run GAIA, it may take a few minutes to download and load models. Subsequent uses will be much faster.
+
+### Command-Line Installation
 
 If you prefer to use the command-line or for CI/CD environments, you can run the installer with parameters:
 
@@ -145,41 +172,58 @@ To completely uninstall GAIA from your system, follow these steps:
 
 Check your desktop for the GAIA-GUI icon and double-click it to launch the GUI. The first time you launch GAIA, it may take a few minutes to start. Subsequent launches will be faster. You may also need to download the latest LLM models from Hugging Face. GAIA will handle this automatically but may request a Hugging Face token for access. If you encounter any issues with model downloads or the GUI application, please refer to the [Troubleshooting](#troubleshooting) section or contact the [AMD GAIA team](mailto:gaia@amd.com).
 
+## Installing Lemonade Server (Required for CLI Commands)
+
+Most GAIA CLI commands require the Lemonade server to be running. If you installed GAIA with the installer, Lemonade server should already be included. However, you can also install it separately:
+
+### Option 1: Standalone Installation
+1. Visit [www.lemonade-server.ai](https://www.lemonade-server.ai) to download the latest release
+2. Download and install `Lemonade_Server_Installer.exe` from the latest release
+3. Ensure your system has the recommended Ryzen AI drivers installed (NPU Driver `32.0.203.237` or `32.0.203.240`)
+4. Launch the server by double-clicking the `lemonade_server` desktop shortcut created during installation
+
+### Option 2: Already Included with GAIA Installer
+If you installed GAIA using our unified installer, Lemonade server is already included. Simply:
+1. Double-click the GAIA-CLI desktop shortcut
+2. Run `lemonade-server serve` in the command prompt to start the server
+
+**Note**: The Lemonade server provides OpenAI-compatible REST API endpoints and enables hybrid NPU/iGPU acceleration on Ryzen AI systems. For more details, see the [AMD Ryzen AI documentation](https://ryzenai.docs.amd.com/en/latest/llm/server_interface.html).
+
 ## Running the GAIA CLI
 
-To quickly get started with GAIA via the command line, you can use the GAIA CLI (`gaia-cli`) tool. Double click on the GAIA-CLI icon to launch the command-line shell with the GAIA environment activated, then run `gaia-cli --help` for help details.
+To quickly get started with GAIA via the command line, you can use the GAIA CLI (`gaia`) tool. Double click on the GAIA-CLI icon to launch the command-line shell with the GAIA environment activated, then run `gaia --help` for help details.
 
 ### Quick Start Examples
 
 **Direct LLM Queries** (fastest option, no server management required):
 ```bash
-gaia-cli llm "What is artificial intelligence?"
-gaia-cli llm "Explain machine learning" --model llama3.2:3b --max-tokens 200
+gaia llm "What is artificial intelligence?"
+gaia llm "Explain machine learning" --model llama3.2:3b --max-tokens 200
 ```
 
 **Interactive Chat Sessions**:
 ```bash
-gaia-cli chat                        # Start text chat with default agent
-gaia-cli chat --agent-name Blender   # Chat with Blender agent for 3D tasks
+gaia chat                        # Start text chat with default agent
+gaia chat --agent-name Blender   # Chat with Blender agent for 3D tasks
 ```
 
 **Single Prompts to Agents**:
 ```bash
-gaia-cli prompt "Create a red cube" --agent-name Blender
-gaia-cli prompt "What's the weather?" --stats
+gaia prompt "Create a red cube" --agent-name Blender
+gaia prompt "What's the weather?" --stats
 ```
 
 **Voice Interaction**:
 ```bash
-gaia-cli talk  # Start voice-based conversation
+gaia talk  # Start voice-based conversation
 ```
 
 **3D Scene Creation with Blender Agent**:
 ```bash
-gaia-cli blender                                    # Run all Blender examples
-gaia-cli blender --interactive                      # Interactive 3D scene creation
-gaia-cli blender --query "Create a red cube and blue sphere"  # Custom 3D scene query
-gaia-cli blender --example 2                        # Run specific example
+gaia blender                                    # Run all Blender examples
+gaia blender --interactive                      # Interactive 3D scene creation
+gaia blender --query "Create a red cube and blue sphere"  # Custom 3D scene query
+gaia blender --example 2                        # Run specific example
 ```
 
 ### Available Commands
@@ -199,7 +243,7 @@ gaia-cli blender --example 2                        # Run specific example
 
 **Blender Command**: The `blender` command additionally requires a Blender MCP server. See [CLI documentation](docs/cli.md#blender-command) for setup instructions.
 
-For comprehensive information and examples, please refer to the [gaia-cli documentation](docs/cli.md).
+For comprehensive information and examples, please refer to the [gaia documentation](docs/cli.md).
 
 ## Building from Source
 

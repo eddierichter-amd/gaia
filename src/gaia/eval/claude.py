@@ -272,11 +272,19 @@ class ClaudeClient:
         ext = os.path.splitext(file_path)[1].lower()
 
         try:
-            # For HTML files, extract text using BeautifulSoup
-            if ext in [".html", ".htm"]:
-                text_content = self._convert_html_to_text(
-                    file_path, save_text, output_dir
-                )
+            # For text-based files, read content directly as text
+            if ext in [".html", ".htm", ".txt", ".md", ".csv"]:
+                if ext in [".html", ".htm"]:
+                    text_content = self._convert_html_to_text(
+                        file_path, save_text, output_dir
+                    )
+                else:
+                    # For other text files, read directly
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        text_content = f.read()
+                    self.log.debug(
+                        f"Read text file, length: {len(text_content)} characters"
+                    )
                 message = self.client.messages.create(
                     model=self.model,
                     max_tokens=self.max_tokens,
@@ -287,7 +295,7 @@ class ClaudeClient:
                         }
                     ],
                 )
-                self.log.info("Successfully analyzed HTML content")
+                self.log.info(f"Successfully analyzed text content ({ext} file)")
 
                 # Extract usage and calculate cost
                 usage = {
@@ -306,16 +314,17 @@ class ClaudeClient:
                     "cost": cost,
                 }
 
-            # For other file types, use the original base64 encoding method
+            # For binary file types (primarily PDFs), use base64 encoding with document format
             mime_types = {
-                ".txt": "text/plain",
                 ".pdf": "application/pdf",
-                ".md": "text/markdown",
-                ".csv": "text/csv",
             }
 
             if media_type is None:
-                media_type = mime_types.get(ext, "application/octet-stream")
+                media_type = mime_types.get(ext)
+                if media_type is None:
+                    raise ValueError(
+                        f"Unsupported file type: {ext}. Supported types: {list(mime_types.keys())}"
+                    )
                 self.log.debug(f"Using media type: {media_type}")
 
             with open(file_path, "rb") as f:
@@ -378,26 +387,35 @@ class ClaudeClient:
         ext = os.path.splitext(file_path)[1].lower()
 
         try:
-            # For HTML files, count tokens of extracted text
-            if ext in [".html", ".htm"]:
-                text_content = self._convert_html_to_text(
-                    file_path, save_text=False, output_dir=output_dir
-                )
+            # For text-based files, count tokens of extracted text
+            if ext in [".html", ".htm", ".txt", ".md", ".csv"]:
+                if ext in [".html", ".htm"]:
+                    text_content = self._convert_html_to_text(
+                        file_path, save_text=False, output_dir=output_dir
+                    )
+                else:
+                    # For other text files, read directly
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        text_content = f.read()
+
                 content = f"Document content:\n\n{text_content}\n\n{prompt}"
                 token_count = self.count_tokens(content)
-                self.log.info(f"HTML file token count: {token_count.input_tokens}")
+                self.log.info(
+                    f"Text file ({ext}) token count: {token_count.input_tokens}"
+                )
                 return token_count.input_tokens
 
-            # For other supported file types, encode and count
+            # For binary file types (primarily PDFs), encode and count
             mime_types = {
-                ".txt": "text/plain",
                 ".pdf": "application/pdf",
-                ".md": "text/markdown",
-                ".csv": "text/csv",
             }
 
             if media_type is None:
-                media_type = mime_types.get(ext, "application/octet-stream")
+                media_type = mime_types.get(ext)
+                if media_type is None:
+                    raise ValueError(
+                        f"Unsupported file type: {ext}. Supported types: {list(mime_types.keys())}"
+                    )
                 self.log.debug(f"Using media type: {media_type}")
 
             with open(file_path, "rb") as f:
