@@ -1,415 +1,381 @@
 #!/usr/bin/env python3
+# Copyright(C) 2024-2025 Advanced Micro Devices, Inc. All rights reserved.
+# SPDX-License-Identifier: MIT
+
 """
-Simple Chat App with conversation history using the existing LLMClient wrapper.
+Gaia Chat SDK Demo Application
+
+This demonstrates various ways to use the ChatSDK for integrating
+text chat capabilities with conversation history into your applications.
 """
 
 import argparse
 import sys
-from collections import deque
-from typing import Optional, List
+import asyncio
 
-from gaia.logger import get_logger
-from gaia.llm.llm_client import LLMClient
-from gaia.agents.chat.prompts import Prompts
+from gaia.agents.chat.sdk import (
+    ChatSDK,
+    ChatConfig,
+    SimpleChat,
+    ChatSession,
+    quick_chat,
+    quick_chat_with_memory,
+)
 
 
-class ChatApp:
-    """Simple Chat application with conversation history using LLMClient."""
+async def demo_basic_chat():
+    """Demo basic chat functionality with conversation memory."""
+    print("=== Basic Chat Demo ===")
 
-    def __init__(
-        self, system_prompt: Optional[str] = None, model: Optional[str] = None
+    config = ChatConfig(
+        model="Llama-3.2-3B-Instruct-Hybrid",
+        show_stats=True,
+        max_history_length=3,  # Keep 3 conversation pairs
+        logging_level="INFO",
+    )
+    chat = ChatSDK(config)
+
+    # Multi-turn conversation
+    messages = [
+        "Hello! My name is Alex and I'm a software developer.",
+        "What's my name?",
+        "What's my profession?",
+        "Can you write a simple Python function?",
+    ]
+
+    for i, message in enumerate(messages, 1):
+        print(f"\nTurn {i}")
+        print(f"User: {message}")
+        response = chat.send(message)
+        print(f"AI: {response.text}")
+
+        if response.stats and i == len(messages):  # Show stats on last message
+            print(f"Stats: {response.stats}")
+
+    print(f"\nConversation pairs in memory: {chat.conversation_pairs}")
+
+
+async def demo_streaming_chat():
+    """Demo streaming chat functionality."""
+    print("\n=== Streaming Chat Demo ===")
+
+    config = ChatConfig(model="Llama-3.2-3B-Instruct-Hybrid", show_stats=True)
+    chat = ChatSDK(config)
+
+    # First establish context
+    chat.send("I'm learning about AI and machine learning.")
+
+    print(
+        "User: Can you explain neural networks in simple terms, based on what you know about my interests?"
+    )
+    print("AI: ", end="", flush=True)
+
+    for chunk in chat.send_stream(
+        "Can you explain neural networks in simple terms, based on what you know about my interests?"
     ):
-        """Initialize the Chat app."""
-        self.log = get_logger(__name__)
-        # Don't pass system_prompt to LLMClient since we handle it through prompts.py
-        self.client = LLMClient(use_local=True, system_prompt=None)
-        self.custom_system_prompt = system_prompt
-        # Use Llama-3.2-3B-Instruct-Hybrid as default model
-        self.model = model or "Llama-3.2-3B-Instruct-Hybrid"
-
-        # Store conversation history
-        self.n_chat_messages = 4
-        self.chat_history = deque(
-            maxlen=self.n_chat_messages * 2
-        )  # Store both user and assistant messages in format expected by prompts.py
-
-        self.log.debug("Chat app initialized")
-
-    def _format_history_for_context(self, model: Optional[str] = None) -> str:
-        """Format chat history for inclusion in LLM context using model-specific formatting."""
-        model_name = model or self.model
-
-        # Convert deque to list format expected by Prompts
-        history_list = list(self.chat_history)
-
-        # Use prompts.py for proper model-specific formatting
-        return Prompts.format_chat_history(model_name, history_list)
-
-    def send_message(
-        self,
-        user_message: str,
-        model: Optional[str] = None,
-        max_tokens: int = 512,
-        stream: bool = False,
-        **kwargs,
-    ) -> str:
-        """Send a message and get response, maintaining conversation history."""
-        if not user_message.strip():
-            raise ValueError("Message cannot be empty")
-
-        self.log.debug(f"Processing message with model: {model or 'default'}")
-
-        # Add user message to history in format expected by prompts.py
-        self.chat_history.append(f"user: {user_message.strip()}")
-
-        # Prepare prompt with conversation context using model-specific formatting
-        model_to_use = model or self.model
-        full_prompt = self._format_history_for_context(model_to_use)
-
-        # Debug: Log the formatted prompt to see what's being sent
-        self.log.debug(f"Full prompt being sent to LLM:\n{full_prompt}")
-
-        # Prepare arguments
-        generate_kwargs = dict(kwargs)
-        if max_tokens:
-            generate_kwargs["max_tokens"] = max_tokens
-
-        # Generate response
-        response = self.client.generate(
-            prompt=full_prompt, model=model_to_use, stream=stream, **generate_kwargs
-        )
-
-        if stream:
-            # Handle streaming response
-            full_response = ""
-            for chunk in response:
-                full_response += chunk
-            assistant_message = full_response
+        if not chunk.is_complete:
+            print(chunk.text, end="", flush=True)
         else:
-            assistant_message = response
-
-        # Add assistant message to history in format expected by prompts.py
-        self.chat_history.append(f"assistant: {assistant_message}")
-
-        return assistant_message
-
-    def get_history(self) -> List[str]:
-        """Get the current conversation history."""
-        return list(self.chat_history)
-
-    def clear_history(self):
-        """Clear the conversation history."""
-        self.chat_history.clear()
-        self.log.debug("Chat history cleared")
-
-    def start_interactive_chat(
-        self, model: Optional[str] = None, max_tokens: int = 512, **kwargs
-    ):
-        """Start an interactive chat session."""
-        print("=" * 50)
-        print("Interactive Chat Session Started")
-        current_model = model or self.model
-        print(f"Using model: {current_model}")
-        print("Type 'quit', 'exit', or 'bye' to end the conversation")
-        print("Commands:")
-        print("  /clear    - clear conversation history")
-        print("  /history  - show conversation history")
-        print("  /system   - show current system prompt")
-        print("  /model    - show current model info")
-        print("  /prompt   - show complete formatted prompt")
-        print("  /stats    - show performance statistics")
-        print("  /help     - show this help message")
-        print("=" * 50)
-
-        while True:
-            try:
-                user_input = input("\nYou: ").strip()
-
-                if user_input.lower() in ["quit", "exit", "bye"]:
-                    print("\nGoodbye!")
-                    break
-                elif user_input.lower() == "/clear":
-                    self.clear_history()
-                    print("Conversation history cleared.")
-                    continue
-                elif user_input.lower() == "/history":
-                    self._display_history()
-                    continue
-                elif user_input.lower() == "/system":
-                    self._display_system_prompt()
-                    continue
-                elif user_input.lower() == "/model":
-                    self._display_model_info()
-                    continue
-                elif user_input.lower() == "/prompt":
-                    self._display_complete_prompt()
-                    continue
-                elif user_input.lower() == "/stats":
-                    self._display_stats()
-                    continue
-                elif user_input.lower() == "/help":
-                    self._display_help()
-                    continue
-                elif not user_input:
-                    print("Please enter a message.")
-                    continue
-
-                print("\nAssistant: ", end="", flush=True)
-
-                # Add user message to history in format expected by prompts.py
-                self.chat_history.append(f"user: {user_input}")
-
-                # Prepare prompt with conversation context using model-specific formatting
-                model_to_use = model or self.model
-                full_prompt = self._format_history_for_context(model_to_use)
-
-                # Debug: Log the formatted prompt to see what's being sent
-                self.log.debug(f"Full prompt being sent to LLM:\n{full_prompt}")
-
-                # Generate and stream response
-                response = self.client.generate(
-                    prompt=full_prompt,
-                    model=model_to_use,
-                    stream=True,
-                    max_tokens=max_tokens,
-                    **kwargs,
-                )
-
-                # Stream and collect the response
-                full_response = ""
-                for chunk in response:
-                    print(chunk, end="", flush=True)
-                    full_response += chunk
-                print()  # Add newline
-
-                # Add assistant message to history in format expected by prompts.py
-                self.chat_history.append(f"assistant: {full_response}")
-
-            except KeyboardInterrupt:
-                print("\n\nChat interrupted. Goodbye!")
-                break
-            except Exception as e:
-                print(f"\nError: {e}")
-                self.log.error(f"Chat error: {e}")
-
-    def _display_history(self):
-        """Display the current conversation history."""
-        if not self.chat_history:
-            print("No conversation history.")
-            return
-
-        print("\n" + "=" * 30)
-        print("Conversation History:")
-        print("=" * 30)
-        for entry in self.chat_history:
-            # Parse the format "role: message"
-            if ": " in entry:
-                role, message = entry.split(": ", 1)
-                print(f"{role.title()}: {message}")
-            else:
-                print(entry)
-        print("=" * 30)
-
-    def _display_system_prompt(self, model: Optional[str] = None):
-        """Display the current system prompt for the given model with formatting."""
-        model_name = model or self.model
-        matched_model = Prompts.match_model_name(model_name)
-
-        # Get model-specific system prompt or use custom one
-        if self.custom_system_prompt:
-            system_msg = self.custom_system_prompt
-        else:
-            system_msg = Prompts.system_messages.get(
-                matched_model, "You are a helpful AI assistant."
-            )
-
-        # Get the format template for this model
-        format_template = Prompts.prompt_formats.get(matched_model, {})
-        system_template = format_template.get("system", "{system_message}")
-
-        # Format the system message using the template
-        formatted_system = system_template.format(system_message=system_msg)
-
-        print("\n" + "=" * 60)
-        print("Current System Prompt Configuration:")
-        print(f"Model: {model_name} (matched as: {matched_model})")
-        print("=" * 60)
-        print("Raw System Message:")
-        print("-" * 30)
-        print(system_msg)
-        print("-" * 30)
-        print("Formatted System Prompt Template:")
-        print("-" * 30)
-        print(repr(formatted_system))
-        print("-" * 30)
-        print("Actual Formatted Output:")
-        print("-" * 30)
-        print(formatted_system)
-        print("=" * 60)
-
-    def _display_model_info(self, model: Optional[str] = None):
-        """Display current model information."""
-        model_name = model or self.model
-        matched_model = Prompts.match_model_name(model_name)
-
-        print("\n" + "=" * 50)
-        print("Current Model Information:")
-        print("=" * 50)
-        print(f"Model Name: {model_name}")
-        print(f"Matched Format: {matched_model}")
-        print(f"Chat History Length: {len(self.chat_history)}")
-        print(f"Max History Length: {self.chat_history.maxlen}")
-        print("=" * 50)
-
-    def _display_complete_prompt(self, model: Optional[str] = None):
-        """Display the complete formatted prompt that would be sent to the LLM."""
-        model_name = model or self.model
-
-        # Get the complete formatted prompt as it would be sent
-        complete_prompt = self._format_history_for_context(model_name)
-
-        print("\n" + "=" * 70)
-        print("Complete Formatted Prompt (as sent to LLM):")
-        print(f"Model: {model_name}")
-        print("=" * 70)
-        print(complete_prompt)
-        print("=" * 70)
-        print(f"Total characters: {len(complete_prompt)}")
-        print("=" * 70)
-
-    def _display_stats(self):
-        """Display performance statistics."""
-        stats = self.get_stats()
-
-        print("\n" + "=" * 50)
-        print("Performance Statistics:")
-        print("=" * 50)
-
-        if stats:
-            for key, value in stats.items():
-                # Format different types of values appropriately
-                if isinstance(value, float):
-                    if "time" in key.lower():
-                        print(f"  {key}: {value:.3f}s")
-                    elif "tokens_per_second" in key.lower():
-                        print(f"  {key}: {value:.2f} tokens/s")
-                    else:
-                        print(f"  {key}: {value:.4f}")
-                elif isinstance(value, int):
-                    if "tokens" in key.lower():
-                        print(f"  {key}: {value:,} tokens")
-                    else:
-                        print(f"  {key}: {value}")
-                else:
-                    print(f"  {key}: {value}")
-        else:
-            print("  No statistics available")
-            print("  (Statistics are collected after LLM interactions)")
-
-        print("=" * 50)
-
-    def _display_help(self):
-        """Display available commands."""
-        print("\n" + "=" * 40)
-        print("Available Commands:")
-        print("=" * 40)
-        print("  /clear    - clear conversation history")
-        print("  /history  - show conversation history")
-        print("  /system   - show current system prompt")
-        print("  /model    - show current model info")
-        print("  /prompt   - show complete formatted prompt")
-        print("  /stats    - show performance statistics")
-        print("  /help     - show this help message")
-        print("\nTo exit: type 'quit', 'exit', or 'bye'")
-        print("=" * 40)
-
-    def get_stats(self):
-        """Get performance statistics."""
-        return self.client.get_performance_stats() or {}
+            print()  # New line at the end
+            if chunk.stats:
+                print(f"Stats: {chunk.stats}")
 
 
-def main(
-    message: Optional[str] = None,
-    model: Optional[str] = None,
-    max_tokens: int = 512,
-    system_prompt: Optional[str] = None,
-    interactive: bool = False,
-) -> Optional[str]:
-    """Main function to run the Chat app."""
-    app = ChatApp(system_prompt=system_prompt, model=model)
+async def demo_simple_chat():
+    """Demo the SimpleChat API."""
+    print("\n=== Simple Chat Demo ===")
 
-    if interactive:
-        app.start_interactive_chat(model=model, max_tokens=max_tokens)
-        return None
-    elif message:
-        return app.send_message(
-            user_message=message, model=model, max_tokens=max_tokens, stream=False
-        )
-    else:
-        raise ValueError("Either message or interactive mode is required")
+    chat = SimpleChat(system_prompt="You are a helpful programming assistant.")
+
+    # Conversation with memory
+    print("User: I'm working on a Python project")
+    response1 = chat.ask("I'm working on a Python project")
+    print(f"AI: {response1}")
+
+    print("\nUser: Can you help me with error handling?")
+    response2 = chat.ask("Can you help me with error handling?")
+    print(f"AI: {response2}")
+
+    # Show conversation history
+    conversation = chat.get_conversation()
+    print(f"\nConversation history: {len(conversation)} entries")
 
 
-def cli_main():
-    """Command line interface."""
-    parser = argparse.ArgumentParser(description="Simple Chat App with History")
+async def demo_chat_sessions():
+    """Demo session-based chat management."""
+    print("\n=== Chat Sessions Demo ===")
+
+    # Create session manager
+    sessions = ChatSession()
+
+    # Create different themed sessions
+    work_chat = sessions.create_session(
+        "work",
+        system_prompt="You are a professional business assistant.",
+        max_history_length=2,
+    )
+
+    casual_chat = sessions.create_session(
+        "casual",
+        system_prompt="You are a friendly, casual conversation partner.",
+        max_history_length=2,
+    )
+
+    # Chat in work context
+    print("=== Work Session ===")
+    print("User: I need to write a project proposal")
+    work_response = work_chat.send("I need to write a project proposal")
+    print(f"Work AI: {work_response.text}")
+
+    # Chat in casual context
+    print("\n=== Casual Session ===")
+    print("User: I need to write a project proposal")
+    casual_response = casual_chat.send("I need to write a project proposal")
+    print(f"Casual AI: {casual_response.text}")
+
+    print(f"\nActive sessions: {sessions.list_sessions()}")
+
+
+async def demo_quick_functions():
+    """Demo convenience functions."""
+    print("\n=== Quick Functions Demo ===")
+
+    # Single message
+    print("User: What's the capital of France?")
+    response = quick_chat("What's the capital of France?")
+    print(f"AI: {response}")
+
+    # Multi-turn with memory
+    print("\n=== Multi-turn Quick Chat ===")
+    messages = [
+        "I have a pet dog named Max",
+        "What's my pet's name?",
+        "What kind of animal is Max?",
+    ]
+
+    responses = quick_chat_with_memory(messages)
+    for msg, resp in zip(messages, responses):
+        print(f"User: {msg}")
+        print(f"AI: {resp}")
+
+
+async def demo_configuration():
+    """Demo configuration options."""
+    print("\n=== Configuration Demo ===")
+
+    # Create chat with custom config
+    config = ChatConfig(
+        model="Llama-3.2-3B-Instruct-Hybrid",
+        system_prompt="You are a helpful assistant that always responds enthusiastically!",
+        max_history_length=2,
+        show_stats=True,
+    )
+    chat = ChatSDK(config)
+
+    print("User: How are you today?")
+    response1 = chat.send("How are you today?")
+    print(f"AI: {response1.text}")
+
+    # Update configuration dynamically
+    chat.update_config(
+        system_prompt="You are now a serious, professional assistant.",
+        max_history_length=1,
+    )
+
+    print("\nUser: How are you today? (after config change)")
+    response2 = chat.send("How are you today?")
+    print(f"AI: {response2.text}")
+
+    print(f"\nHistory length after config change: {chat.history_length}")
+
+
+def print_integration_examples():
+    """Print example code for integration."""
+    print("\n" + "=" * 60)
+    print("INTEGRATION EXAMPLES")
+    print("=" * 60)
+
+    print(
+        """
+Basic Integration:
+```python
+from gaia.agents.chat.sdk import ChatSDK, ChatConfig
+
+# Create SDK instance
+config = ChatConfig(model="Llama-3.2-3B-Instruct-Hybrid", show_stats=True)
+chat = ChatSDK(config)
+
+# Send message with conversation memory
+response = chat.send("Hello!")
+print(response.text)
+
+# Streaming chat
+for chunk in chat.send_stream("Tell me a story"):
+    print(chunk.text, end="", flush=True)
+```
+
+Simple Integration:
+```python
+from gaia.agents.chat.sdk import SimpleChat
+
+chat = SimpleChat()
+response = chat.ask("What's the weather?")
+print(response)
+```
+
+Session Management:
+```python
+from gaia.agents.chat.sdk import ChatSession
+
+sessions = ChatSession()
+work_chat = sessions.create_session("work", system_prompt="Professional assistant")
+personal_chat = sessions.create_session("personal", system_prompt="Friendly companion")
+
+work_response = work_chat.send("Draft an email")
+personal_response = personal_chat.send("What's for dinner?")
+```
+
+Quick One-off Usage:
+```python
+from gaia.agents.chat.sdk import quick_chat, quick_chat_with_memory
+
+# Single message
+response = await quick_chat("Hello!")
+
+# Multi-turn conversation
+responses = await quick_chat_with_memory([
+    "My name is John",
+    "What's my name?"
+])
+```
+"""
+    )
+
+
+async def main():
+    """Main entry point for the Chat SDK demo application."""
+    parser = argparse.ArgumentParser(
+        description="Gaia Chat SDK Demo - Examples of text chat with conversation history",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Demo Types:
+  basic     - Basic chat with conversation memory
+  stream    - Streaming chat demo
+  simple    - SimpleChat API demo
+  sessions  - Session management demo
+  quick     - Quick functions demo
+  config    - Configuration options demo
+  all       - Run all demos sequentially
+  examples  - Show integration code examples only
+        """,
+    )
 
     parser.add_argument(
-        "message",
+        "demo",
         nargs="?",
-        help="Message to send to the chatbot (defaults to interactive mode if not provided)",
+        default="basic",
+        choices=[
+            "basic",
+            "stream",
+            "simple",
+            "sessions",
+            "quick",
+            "config",
+            "all",
+            "examples",
+        ],
+        help="Type of demo to run (default: basic)",
     )
-    parser.add_argument("--model", help="Model name to use")
+
+    # Configuration options for demos
     parser.add_argument(
-        "--max-tokens", type=int, default=512, help="Max tokens (default: 512)"
+        "--model", default="Llama-3.2-3B-Instruct-Hybrid", help="Model to use for demos"
     )
-    parser.add_argument("--system-prompt", help="System prompt")
+    parser.add_argument("--system-prompt", help="Custom system prompt for the AI")
     parser.add_argument(
-        "--interactive", "-i", action="store_true", help="Force interactive chat mode"
-    )
-    parser.add_argument("--stats", action="store_true", help="Show stats")
-    parser.add_argument(
-        "--logging-level",
-        default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Logging level",
+        "--verbose", "-v", action="store_true", help="Enable verbose logging"
     )
 
     args = parser.parse_args()
 
-    # Setup logging
-    import logging
-    from gaia.logger import log_manager
+    # Show just examples
+    if args.demo == "examples":
+        print_integration_examples()
+        return
 
-    log_manager.set_level("gaia", getattr(logging, args.logging_level))
+    print("💬 Gaia Chat SDK Demo")
+    print("=" * 50)
 
     try:
-        if args.interactive or not args.message:
-            # Default to interactive mode if no message provided
-            main(
-                model=args.model,
-                max_tokens=args.max_tokens,
-                system_prompt=args.system_prompt,
-                interactive=True,
-            )
-        else:
-            # Single message mode
-            response = main(
-                message=args.message,
-                model=args.model,
-                max_tokens=args.max_tokens,
-                system_prompt=args.system_prompt,
-                interactive=False,
-            )
-            print(f"\n{'='*50}")
-            print("Chat Response:")
-            print("=" * 50)
-            print(response)
-            print("=" * 50)
+        if args.demo == "all":
+            # Run all demos
+            await demo_basic_chat()
+            await demo_streaming_chat()
+            await demo_simple_chat()
+            await demo_chat_sessions()
+            await demo_quick_functions()
+            await demo_configuration()
+            print_integration_examples()
 
+        elif args.demo == "basic":
+            await demo_basic_chat()
+        elif args.demo == "stream":
+            await demo_streaming_chat()
+        elif args.demo == "simple":
+            await demo_simple_chat()
+        elif args.demo == "sessions":
+            await demo_chat_sessions()
+        elif args.demo == "quick":
+            await demo_quick_functions()
+        elif args.demo == "config":
+            await demo_configuration()
+
+        # Always show integration examples at the end
+        if args.demo != "all":
+            print_integration_examples()
+
+    except KeyboardInterrupt:
+        print("\n\nDemo interrupted. Goodbye!")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"\n❌ Error: {e}")
+        if args.verbose:
+            import traceback
+
+            traceback.print_exc()
         sys.exit(1)
+
+    print("\n✅ Demo completed successfully!")
+    print("\nTo integrate ChatSDK into your app:")
+    print("  from gaia.agents.chat.sdk import ChatSDK, ChatConfig")
+    print("\nFor more examples, run: python app.py examples")
+
+
+# Keep the original main function for backward compatibility with CLI
+def cli_main(
+    message: str = None,
+    model: str = None,
+    max_tokens: int = 512,
+    system_prompt: str = None,
+    interactive: bool = False,
+) -> str:
+    """Main function to run the Chat app (backward compatibility)."""
+    if interactive:
+        print("Interactive mode not available in demo app.")
+        print("Use: python app.py basic")
+        return None
+    elif message:
+        # Use SimpleChat for backward compatibility
+        config = ChatConfig(
+            model=model or "Llama-3.2-3B-Instruct-Hybrid",
+            max_tokens=max_tokens,
+            system_prompt=system_prompt,
+        )
+        chat = ChatSDK(config)
+        response = chat.send(message)
+        return response.text
+    else:
+        raise ValueError("Either message or interactive mode is required")
 
 
 if __name__ == "__main__":
-    cli_main()
+    asyncio.run(main())

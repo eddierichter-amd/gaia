@@ -259,45 +259,32 @@ class GaiaCliClient:
     ):
         """Chat interface using the new ChatApp - interactive if no message, single message if message provided"""
         try:
-            from gaia.agents.chat.app import main as chat_main
+            from gaia.agents.chat.sdk import ChatSDK, ChatConfig
 
             # Interactive mode if no message provided, single message mode if message provided
             use_interactive = message is None
 
             if use_interactive:
-                # Interactive mode
-                chat_main(
-                    model=model,
+                # Interactive mode using ChatSDK
+                config = ChatConfig(
+                    model=model or "Llama-3.2-3B-Instruct-Hybrid",
                     max_tokens=max_tokens,
                     system_prompt=system_prompt,
-                    interactive=True,
+                    show_stats=stats,
                 )
+                chat = ChatSDK(config)
+                asyncio.run(chat.start_interactive_session())
             else:
                 # Single message mode
-                response = chat_main(
-                    message=message,
-                    model=model,
+                config = ChatConfig(
+                    model=model or "Llama-3.2-3B-Instruct-Hybrid",
                     max_tokens=max_tokens,
                     system_prompt=system_prompt,
-                    interactive=False,
+                    show_stats=False,
                 )
-
-                # Display response directly
-                print(response)
-
-                # Show stats if requested
-                if stats:
-                    from gaia.agents.chat.app import ChatApp
-
-                    app = ChatApp(system_prompt=system_prompt, model=model)
-                    stats_data = app.get_stats()
-                    if stats_data:
-                        print(f"\n{'='*30}")
-                        print("Performance Statistics:")
-                        print("=" * 30)
-                        for key, value in stats_data.items():
-                            print(f"{key}: {value}")
-                        print("=" * 30)
+                chat = ChatSDK(config)
+                response = chat.send(message)
+                return response.text
 
         except Exception as e:
             # Check if it's a connection error and provide helpful message
@@ -334,13 +321,33 @@ async def async_main(action, **kwargs):
                 return {"response": response, "stats": stats}
         return {"response": response}
     elif action == "chat":
-        client.chat(
-            message=kwargs.get("message"),
-            model=kwargs.get("model"),
+        # Use ChatSDK for chat functionality
+        from gaia.agents.chat.sdk import ChatSDK, ChatConfig
+
+        # Create SDK configuration
+        config = ChatConfig(
+            model=kwargs.get("model", "Llama-3.2-3B-Instruct-Hybrid"),
             max_tokens=kwargs.get("max_tokens", 512),
             system_prompt=kwargs.get("system_prompt"),
-            stats=kwargs.get("stats", False),
+            show_stats=kwargs.get("stats", False),
+            logging_level=kwargs.get("logging_level", "INFO"),
         )
+
+        chat_sdk = ChatSDK(config)
+
+        message = kwargs.get("message")
+        if message:
+            # Single message mode
+            response = chat_sdk.send(message)
+            print(response.text)
+
+            # Show stats if requested
+            if kwargs.get("stats", False):
+                chat_sdk.display_stats(response.stats)
+        else:
+            # Interactive mode using ChatSDK
+            await chat_sdk.start_interactive_session()
+
         return
     elif action == "talk":
         await client.talk()
@@ -1384,15 +1391,27 @@ Let me know your answer!
     if args.action == "youtube":
         if args.download_transcript:
             log.info(f"Downloading transcript from {args.download_transcript}")
-            from llama_index.readers.youtube_transcript import YoutubeTranscriptReader
+            try:
+                from llama_index.readers.youtube_transcript import (
+                    YoutubeTranscriptReader,
+                )
 
-            doc = YoutubeTranscriptReader().load_data(
-                ytlinks=[args.download_transcript]
-            )
-            output_path = args.output_path or "transcript.txt"
-            with open(output_path, "w", encoding="utf-8") as f:
-                f.write(doc[0].text)
-            print(f"✅ Transcript downloaded to: {output_path}")
+                doc = YoutubeTranscriptReader().load_data(
+                    ytlinks=[args.download_transcript]
+                )
+                output_path = args.output_path or "transcript.txt"
+                with open(output_path, "w", encoding="utf-8") as f:
+                    f.write(doc[0].text)
+                print(f"✅ Transcript downloaded to: {output_path}")
+            except ImportError as e:
+                print(
+                    "❌ Error: YouTube transcript functionality requires additional dependencies."
+                )
+                print(
+                    "Please install: pip install llama-index-readers-youtube-transcript"
+                )
+                print(f"Import error: {e}")
+                sys.exit(1)
             return
 
     # Handle kill command
