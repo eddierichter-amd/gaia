@@ -11,14 +11,11 @@ GAIA CLI's talk mode enables voice-based interaction with LLMs using Whisper for
 
 1. Once installed, double click on the desktop icon **GAIA-CLI** to launch the command-line shell with the GAIA environment activated.
 
-1. Start the servers with default settings:
+1. Start the Lemonade server:
    ```bash
-   gaia start
+   lemonade-server serve
    ```
-   For optimal performance, use Llama 3.2 1B Instruct model in iGPU/NPU-hybrid mode:
-   ```bash
-   gaia start --model "amd/Llama-3.2-1B-Instruct-awq-g128-int4-asym-fp16-onnx-hybrid" --backend "oga" --device "hybrid" --dtype "int4"
-   ```
+   Or double-click the desktop shortcut to start the server.
 
 1. Launch talk mode:
    ```bash

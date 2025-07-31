@@ -4,7 +4,6 @@
 import sys
 import argparse
 import time
-import json
 import asyncio
 import queue
 import logging
@@ -12,16 +11,13 @@ import subprocess
 from pathlib import Path
 import os
 
-import aiohttp
-from aiohttp import ClientTimeout
-import requests
-
 from gaia.logger import get_logger
 from gaia.audio.audio_client import AudioClient
 from gaia.version import version
 from gaia.agents.Blender.agent import BlenderAgent
 from gaia.mcp.blender_mcp_client import MCPClient
 from gaia.llm.lemonade_client import LemonadeClient, LemonadeClientError
+from gaia.llm.llm_client import LLMClient
 
 # Set debug level for the logger
 logging.getLogger("gaia").setLevel(logging.INFO)
@@ -135,9 +131,6 @@ class GaiaCliClient:
 
     def __init__(
         self,
-        agent_name="Chaty",
-        host="127.0.0.1",
-        port=8001,
         model="Llama-3.2-3B-Instruct-Hybrid",
         max_tokens=512,
         whisper_model_size="base",
@@ -151,16 +144,13 @@ class GaiaCliClient:
         # Set the logging level for this instance's logger
         self.log.setLevel(getattr(logging, logging_level))
 
-        self.agent_name = agent_name
-        self.host = host
-        self.port = port
-        self.llm_port = 8000
-        self.agent_url = f"http://{host}:{port}"
-        self.llm_url = f"http://{host}:{self.llm_port}"
         self.model = model
         self.max_tokens = max_tokens
         self.cli_mode = True  # Set this to True for CLI mode
         self.show_stats = show_stats
+
+        # Initialize LLM client for direct communication
+        self.llm_client = LLMClient(use_local=True)
 
         # Initialize audio client for voice functionality
         self.audio_client = AudioClient(
@@ -168,63 +158,38 @@ class GaiaCliClient:
             audio_device_index=audio_device_index,
             silence_threshold=silence_threshold,
             enable_tts=enable_tts,
-            host=host,
-            port=port,
-            llm_port=self.llm_port,
-            agent_name=agent_name,
             logging_level=logging_level,
         )
 
         self.log.debug("Gaia CLI client initialized.")
-        self.log.debug(
-            f"agent_name: {self.agent_name}\n host: {self.host}\n"
-            f"port: {self.port}\n llm_port: {self.llm_port}\n"
-            f"model: {self.model}\n max_tokens: {self.max_tokens}"
-        )
+        self.log.debug(f"model: {self.model}\n max_tokens: {self.max_tokens}")
 
     async def send_message(self, message):
-        url = f"{self.agent_url}/prompt"
-        data = {"prompt": message}
         try:
-            async with aiohttp.ClientSession(
-                timeout=ClientTimeout(total=3600)
-            ) as session:
-                async with session.post(url, json=data) as response:
-                    if response.status == 200:
-                        async for chunk in response.content.iter_any():
-                            chunk = chunk.decode("utf-8")
-                            print(chunk, end="", flush=True)
-                            yield chunk
-                    else:
-                        error_text = await response.text()
-                        error_message = f"❌ Error: {response.status} - {error_text}"
-                        print(error_message)
-                        yield error_message
-        except aiohttp.ClientError as e:
+            # Use LLMClient.generate with streaming
+            response_generator = self.llm_client.generate(
+                prompt=message,
+                model=self.model,
+                stream=True,
+                max_tokens=self.max_tokens,
+            )
+
+            for chunk in response_generator:
+                print(chunk, end="", flush=True)
+                yield chunk
+
+        except Exception as e:
             error_message = f"❌ Error: {str(e)}"
             self.log.error(error_message)
+            print(error_message)
             yield error_message
 
     def get_stats(self):
-        url = f"{self.llm_url}/stats"
         try:
-            response = requests.get(url, timeout=10)
-            self.log.debug(f"{url}: {response.json()}")
-            if response.status_code == 200:
-                try:
-                    stats = response.json()
-                    self.log.debug(f"Stats received: {stats}")
-                    return stats
-                except json.JSONDecodeError as je:
-                    self.log.error(f"Failed to parse JSON response: {response.text}")
-                    self.log.error(f"JSON decode error: {str(je)}")
-                    return None
-            else:
-                self.log.error(
-                    f"Failed to get stats. Status code: {response.status_code}"
-                )
-                return None
-        except requests.RequestException as e:
+            stats = self.llm_client.get_performance_stats()
+            self.log.debug(f"Stats received: {stats}")
+            return stats
+        except Exception as e:
             self.log.error(f"Error while fetching stats: {str(e)}")
             return None
 
@@ -412,22 +377,7 @@ def main():
         "message",
         help="Message to send to Gaia",
     )
-    prompt_parser.add_argument(
-        "--agent-name",
-        default="Chaty",
-        help="Name of the Gaia agent to use (e.g., Llm, Chaty, Joker, Clip, Rag, etc.)",
-    )
-    prompt_parser.add_argument(
-        "--host",
-        default="127.0.0.1",
-        help="Host address for the Agent server (default: 127.0.0.1)",
-    )
-    prompt_parser.add_argument(
-        "--port",
-        type=int,
-        default=8001,
-        help="Port for the Agent server (default: 8001)",
-    )
+
     prompt_parser.add_argument(
         "--model",
         default="Llama-3.2-3B-Instruct-Hybrid",
@@ -475,22 +425,7 @@ def main():
     talk_parser = subparsers.add_parser(
         "talk", help="Start voice conversation with Gaia", parents=[parent_parser]
     )
-    talk_parser.add_argument(
-        "--agent-name",
-        default="Chaty",
-        help="Name of the Gaia agent to use (e.g., Llm, Chaty, Joker, Clip, Rag, etc.)",
-    )
-    talk_parser.add_argument(
-        "--host",
-        default="127.0.0.1",
-        help="Host address for the Agent server (default: 127.0.0.1)",
-    )
-    talk_parser.add_argument(
-        "--port",
-        type=int,
-        default=8001,
-        help="Port for the Agent server (default: 8001)",
-    )
+
     talk_parser.add_argument(
         "--model",
         default="Llama-3.2-3B-Instruct-Hybrid",
@@ -583,15 +518,10 @@ def main():
         help="Port for the Blender MCP server (default: 9876)",
     )
 
-    stats_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "stats",
         help="Show Gaia statistics from the most recent run.",
         parents=[parent_parser],
-    )
-    stats_parser.add_argument(
-        "--host",
-        default="127.0.0.1",
-        help="Host address for the LLM server (default: 127.0.0.1)",
     )
 
     # Add utility commands to main parser instead of creating a separate parser

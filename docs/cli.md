@@ -161,9 +161,6 @@ gaia prompt "MESSAGE" [OPTIONS]
 ```
 
 **Available options:**
-- `--agent-name`: Name of the Gaia agent to use (default: "Chaty")
-- `--host`: Host address for the Agent server (default: "127.0.0.1")
-- `--port`: Port for the Agent server (default: 8001)
 - `--model`: Model to use for the agent (default: "llama3.2:1b")
 - `--max-new-tokens`: Maximum number of new tokens to generate (default: 512)
 - `--stats`: Show performance statistics after generation
@@ -173,8 +170,8 @@ gaia prompt "MESSAGE" [OPTIONS]
 # Basic prompt
 gaia prompt "What is the weather like today?"
 
-# Use a specific agent with stats
-gaia prompt "Create a 3D cube" --agent-name Blender --stats
+# Use a different model with stats
+gaia prompt "Create a poem about AI" --model llama3.2:3b --stats
 
 # Use different model and token limit
 gaia prompt "Write a story" --model llama3.2:3b --max-new-tokens 1000
@@ -235,9 +232,6 @@ gaia talk [OPTIONS]
 ```
 
 **Available options:**
-- `--agent-name`: Name of the Gaia agent to use (default: "Chaty")
-- `--host`: Host address for the Agent server (default: "127.0.0.1")
-- `--port`: Port for the Agent server (default: 8001)
 - `--model`: Model to use for the agent (default: "llama3.2:1b")
 - `--max-new-tokens`: Maximum number of new tokens to generate (default: 512)
 - `--no-tts`: Disable text-to-speech in voice chat mode
@@ -276,9 +270,6 @@ View performance statistics from the most recent model run:
 ```bash
 gaia stats [OPTIONS]
 ```
-
-**Available options:**
-- `--host`: Host address for the LLM server (default: "127.0.0.1")
 
 ## Evaluation Commands
 

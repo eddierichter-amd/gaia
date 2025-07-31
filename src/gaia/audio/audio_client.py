@@ -22,7 +22,7 @@ class AudioClient:
         host="127.0.0.1",
         port=8001,
         llm_port=8000,
-        agent_name="Chaty",
+        agent_name="Gaia",
         logging_level="INFO",
     ):
         self.log = get_logger(__name__)
@@ -34,7 +34,7 @@ class AudioClient:
         self.silence_threshold = silence_threshold
         self.enable_tts = enable_tts
 
-        # Server configuration
+        # Server configuration (for audio pipeline - will be handled in separate PR)
         self.host = host
         self.port = port
         self.llm_port = llm_port
@@ -54,7 +54,7 @@ class AudioClient:
         try:
             self.log.debug("Initializing voice chat...")
             print(
-                f"Starting voice chat with {self.agent_name}.\n"
+                "Starting voice chat with Gaia.\n"
                 "Say 'stop' to quit application "
                 "or 'restart' to clear the chat history.\n"
                 "Press Enter key to stop during audio playback."
