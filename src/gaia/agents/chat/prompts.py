@@ -73,7 +73,12 @@ class Prompts:
     }
 
     @staticmethod
-    def format_chat_history(model: str, chat_history: list) -> str:
+    def format_chat_history(
+        model: str,
+        chat_history: list,
+        assistant_name: str = "assistant",
+        system_prompt: str = None,
+    ) -> str:
         """Format the chat history according to the model's requirements."""
         matched_model = Prompts.match_model_name(model)
         format_template = Prompts.prompt_formats.get(matched_model)
@@ -84,19 +89,56 @@ class Prompts:
         if not format_template:
             raise ValueError(f"No format template found for model {matched_model}")
 
-        # Start with the system message
-        system_msg = Prompts.system_messages.get(
-            matched_model, "You are a helpful assistant."
-        )
+        # Start with the system message - use custom system_prompt if provided, otherwise use default with assistant_name
+        if system_prompt:
+            system_msg = system_prompt
+        else:
+            base_msg = Prompts.system_messages.get(
+                matched_model, "You are a helpful assistant."
+            )
+            # Incorporate assistant_name into the default system message if it's not "assistant"
+            if assistant_name != "assistant":
+                system_msg = base_msg.replace(
+                    "helpful AI assistant",
+                    f"helpful AI assistant named {assistant_name}",
+                )
+                system_msg = system_msg.replace(
+                    "You are a helpful assistant",
+                    f"You are {assistant_name}, a helpful assistant",
+                )
+                # Handle specific model names
+                if matched_model == "chatglm":
+                    system_msg = system_msg.replace(
+                        "You are ChatGLM3", f"You are {assistant_name} (ChatGLM3)"
+                    )
+                elif matched_model == "gemma":
+                    system_msg = system_msg.replace(
+                        "You are Gemma", f"You are {assistant_name} (Gemma)"
+                    )
+                elif matched_model == "deepseek":
+                    system_msg = system_msg.replace(
+                        "You are DeepSeek R1", f"You are {assistant_name} (DeepSeek R1)"
+                    )
+                elif matched_model == "qwen":
+                    system_msg = system_msg.replace(
+                        "You are Qwen", f"You are {assistant_name} (Qwen)"
+                    )
+            else:
+                system_msg = base_msg
+
         formatted_prompt = format_template["system"].format(system_message=system_msg)
+
+        # Create dynamic prefixes
+        user_prefix = "user: "
+        assistant_prefix = f"{assistant_name}: "
 
         if matched_model == "gemma":
             for entry in chat_history:
-                if entry.startswith("user: "):
-                    content = entry[6:]
+                if entry.startswith(user_prefix):
+                    content = entry[len(user_prefix) :]
                     formatted_prompt += format_template["user"].format(content=content)
-                elif entry.startswith("assistant: "):
-                    content = entry[11:]
+                elif entry.startswith(assistant_prefix):
+                    content = entry[len(assistant_prefix) :]
                     formatted_prompt += format_template["assistant"].format(
                         content=content
                     )
@@ -105,60 +147,60 @@ class Prompts:
                     )
 
             # Add the assistant prefix if the last message was from user
-            if chat_history and chat_history[-1].startswith("user: "):
+            if chat_history and chat_history[-1].startswith(user_prefix):
                 formatted_prompt += format_template["assistant"].format(content="")
 
             return formatted_prompt
 
         elif matched_model == "llama3":
             for i, entry in enumerate(chat_history):
-                if entry.startswith("user: "):
-                    content = entry[6:]
+                if entry.startswith(user_prefix):
+                    content = entry[len(user_prefix) :]
                     formatted_prompt += format_template["user"].format(content=content)
-                elif entry.startswith("assistant: "):
-                    content = entry[11:]
+                elif entry.startswith(assistant_prefix):
+                    content = entry[len(assistant_prefix) :]
                     formatted_prompt += (
                         format_template["assistant"].format(content=content)
                         + "<|eot_id|>"
                     )
 
-            if chat_history and chat_history[-1].startswith("user: "):
+            if chat_history and chat_history[-1].startswith(user_prefix):
                 formatted_prompt += format_template["assistant"].format(content="")
 
             return formatted_prompt
 
         elif matched_model == "mistral":
             for i, entry in enumerate(chat_history):
-                if entry.startswith("user: "):
-                    content = entry[6:]
+                if entry.startswith(user_prefix):
+                    content = entry[len(user_prefix) :]
                     if i > 0:  # Add new instruction block for all but first message
                         formatted_prompt += "<s>[INST] "
                     formatted_prompt += format_template["user"].format(content=content)
-                elif entry.startswith("assistant: "):
-                    content = entry[11:]
+                elif entry.startswith(assistant_prefix):
+                    content = entry[len(assistant_prefix) :]
                     formatted_prompt += format_template["assistant"].format(
                         content=content
                     )
 
             # Add final [INST] block if last message was from user
-            if chat_history and chat_history[-1].startswith("user: "):
+            if chat_history and chat_history[-1].startswith(user_prefix):
                 formatted_prompt += " [/INST]"
 
             return formatted_prompt
 
         elif matched_model == "qwen":
             for entry in chat_history:
-                if entry.startswith("user: "):
-                    content = entry[6:]
+                if entry.startswith(user_prefix):
+                    content = entry[len(user_prefix) :]
                     formatted_prompt += format_template["user"].format(content=content)
-                elif entry.startswith("assistant: "):
-                    content = entry[11:]
+                elif entry.startswith(assistant_prefix):
+                    content = entry[len(assistant_prefix) :]
                     formatted_prompt += format_template["assistant"].format(
                         content=content
                     )
 
             # Add the final assistant token for the next response
-            if chat_history and chat_history[-1].startswith("user: "):
+            if chat_history and chat_history[-1].startswith(user_prefix):
                 formatted_prompt += "<|im_start|>assistant\n"
 
             return formatted_prompt
@@ -170,17 +212,17 @@ class Prompts:
             )
 
             for i, entry in enumerate(chat_history):
-                if entry.startswith("user: "):
-                    content = entry[6:]
+                if entry.startswith(user_prefix):
+                    content = entry[len(user_prefix) :]
                     if i > 0:  # Not the first message
                         formatted_prompt += "</s><s>[INST] "
                     formatted_prompt += content
-                elif entry.startswith("assistant: "):
-                    content = entry[11:]
+                elif entry.startswith(assistant_prefix):
+                    content = entry[len(assistant_prefix) :]
                     formatted_prompt += " [/INST] " + content
 
             # Add final [/INST] if last message was from user
-            if chat_history and chat_history[-1].startswith("user: "):
+            if chat_history and chat_history[-1].startswith(user_prefix):
                 formatted_prompt += " [/INST]"
 
             return formatted_prompt
@@ -192,11 +234,11 @@ class Prompts:
             )
 
             for entry in chat_history:
-                if entry.startswith("user: "):
-                    content = entry[6:]
+                if entry.startswith(user_prefix):
+                    content = entry[len(user_prefix) :]
                     formatted_prompt += format_template["user"].format(content=content)
-                elif entry.startswith("assistant: "):
-                    content = entry[11:]
+                elif entry.startswith(assistant_prefix):
+                    content = entry[len(assistant_prefix) :]
                     formatted_prompt += format_template["assistant"].format(
                         content=content
                     )
@@ -209,17 +251,17 @@ class Prompts:
                     )
 
             # Add the assistant prefix if the last message was from user
-            if chat_history and chat_history[-1].startswith("user: "):
+            if chat_history and chat_history[-1].startswith(user_prefix):
                 formatted_prompt += "<|assistant|>\n"
 
             return formatted_prompt
 
         # Standard handling for other models
         for entry in chat_history:
-            if entry.startswith("user: "):
-                role, content = "user", entry[6:]
-            elif entry.startswith("assistant: "):
-                role, content = "assistant", entry[11:]
+            if entry.startswith(user_prefix):
+                role, content = "user", entry[len(user_prefix) :]
+            elif entry.startswith(assistant_prefix):
+                role, content = "assistant", entry[len(assistant_prefix) :]
             else:
                 continue
 
@@ -230,11 +272,11 @@ class Prompts:
         if (
             "assistant_prefix" in format_template
             and chat_history
-            and chat_history[-1].startswith("user: ")
+            and chat_history[-1].startswith(user_prefix)
         ):
             formatted_prompt += format_template["assistant_prefix"]
         # If no assistant_prefix but we need to add assistant marker
-        elif chat_history and chat_history[-1].startswith("user: "):
+        elif chat_history and chat_history[-1].startswith(user_prefix):
             if "assistant" in format_template:
                 formatted_prompt += format_template["assistant"].format(content="")
 
@@ -267,9 +309,17 @@ class Prompts:
             return "default"
 
     @classmethod
-    def get_system_prompt(cls, model: str, chat_history: list[str]) -> str:
+    def get_system_prompt(
+        cls,
+        model: str,
+        chat_history: list[str],
+        assistant_name: str = "assistant",
+        system_prompt: str = None,
+    ) -> str:
         """Get the formatted system prompt for the given model and chat history."""
-        return cls.format_chat_history(model, chat_history)
+        return cls.format_chat_history(
+            model, chat_history, assistant_name, system_prompt
+        )
 
 
 def main():

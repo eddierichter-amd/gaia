@@ -27,6 +27,7 @@ class ChatConfig:
     show_stats: bool = False
     logging_level: str = "INFO"
     use_local_llm: bool = True
+    assistant_name: str = "assistant"  # Name to use for the assistant in conversations
 
 
 @dataclass
@@ -92,7 +93,12 @@ class ChatSDK:
     def _format_history_for_context(self) -> str:
         """Format chat history for inclusion in LLM context using model-specific formatting."""
         history_list = list(self.chat_history)
-        return Prompts.format_chat_history(self.config.model, history_list)
+        return Prompts.format_chat_history(
+            self.config.model,
+            history_list,
+            self.config.assistant_name,
+            self.config.system_prompt,
+        )
 
     def send(self, message: str, **kwargs) -> ChatResponse:
         """
@@ -125,7 +131,7 @@ class ChatSDK:
             )
 
             # Add assistant message to history
-            self.chat_history.append(f"assistant: {response}")
+            self.chat_history.append(f"{self.config.assistant_name}: {response}")
 
             # Prepare response data
             stats = None
@@ -180,7 +186,7 @@ class ChatSDK:
                 yield ChatResponse(text=chunk, is_complete=False)
 
             # Add complete assistant message to history
-            self.chat_history.append(f"assistant: {full_response}")
+            self.chat_history.append(f"{self.config.assistant_name}: {full_response}")
 
             # Send final response with stats and history if requested
             stats = None
@@ -221,8 +227,20 @@ class ChatSDK:
             List of dictionaries with 'role' and 'message' keys
         """
         formatted = []
+        assistant_prefix = f"{self.config.assistant_name}: "
+
         for entry in self.chat_history:
-            if ": " in entry:
+            if entry.startswith("user: "):
+                role, message = "user", entry[6:]
+                formatted.append({"role": role, "message": message})
+            elif entry.startswith(assistant_prefix):
+                role, message = (
+                    self.config.assistant_name,
+                    entry[len(assistant_prefix) :],
+                )
+                formatted.append({"role": role, "message": message})
+            elif ": " in entry:
+                # Fallback for any other format
                 role, message = entry.split(": ", 1)
                 formatted.append({"role": role, "message": message})
             else:
@@ -334,7 +352,7 @@ class ChatSDK:
                     print("Please enter a message.")
                     continue
 
-                print("\nAssistant: ", end="", flush=True)
+                print(f"\n{self.config.assistant_name.title()}: ", end="", flush=True)
 
                 # Generate and stream response
                 for chunk in self.send_stream(user_input):
@@ -376,6 +394,11 @@ class ChatSDK:
             # System prompt is handled through Prompts class, not directly
             pass
 
+        if "assistant_name" in kwargs:
+            # Assistant name change affects history display but not underlying storage
+            # since we dynamically parse the history based on current assistant_name
+            pass
+
     @property
     def history_length(self) -> int:
         """Get the current number of conversation entries."""
@@ -408,7 +431,10 @@ class SimpleChat:
     """
 
     def __init__(
-        self, system_prompt: Optional[str] = None, model: Optional[str] = None
+        self,
+        system_prompt: Optional[str] = None,
+        model: Optional[str] = None,
+        assistant_name: Optional[str] = None,
     ):
         """
         Initialize SimpleChat with minimal configuration.
@@ -416,10 +442,12 @@ class SimpleChat:
         Args:
             system_prompt: Optional system prompt for the AI
             model: Model to use (defaults to Llama-3.2-3B-Instruct-Hybrid)
+            assistant_name: Name to use for the assistant (defaults to "assistant")
         """
         config = ChatConfig(
             model=model or "Llama-3.2-3B-Instruct-Hybrid",
             system_prompt=system_prompt,
+            assistant_name=assistant_name or "assistant",
             show_stats=False,
             logging_level="WARNING",  # Minimal logging
         )
@@ -524,6 +552,9 @@ class ChatSession:
                 use_local_llm=config_kwargs.get(
                     "use_local_llm", self.default_config.use_local_llm
                 ),
+                assistant_name=config_kwargs.get(
+                    "assistant_name", self.default_config.assistant_name
+                ),
             )
 
         session = ChatSDK(config)
@@ -555,7 +586,10 @@ class ChatSession:
 
 # Convenience functions for one-off usage
 def quick_chat(
-    message: str, system_prompt: Optional[str] = None, model: Optional[str] = None
+    message: str,
+    system_prompt: Optional[str] = None,
+    model: Optional[str] = None,
+    assistant_name: Optional[str] = None,
 ) -> str:
     """
     Quick one-off text chat without conversation memory.
@@ -564,6 +598,7 @@ def quick_chat(
         message: Message to send
         system_prompt: Optional system prompt
         model: Optional model to use
+        assistant_name: Name to use for the assistant
 
     Returns:
         AI response
@@ -571,9 +606,10 @@ def quick_chat(
     config = ChatConfig(
         model=model or "Llama-3.2-3B-Instruct-Hybrid",
         system_prompt=system_prompt,
+        assistant_name=assistant_name or "assistant",
         show_stats=False,
         logging_level="WARNING",
-        max_history_length=0,  # No history for quick chat
+        max_history_length=2,  # Small history for quick chat
     )
     sdk = ChatSDK(config)
     response = sdk.send(message)
@@ -584,6 +620,7 @@ def quick_chat_with_memory(
     messages: List[str],
     system_prompt: Optional[str] = None,
     model: Optional[str] = None,
+    assistant_name: Optional[str] = None,
 ) -> List[str]:
     """
     Quick multi-turn chat with conversation memory.
@@ -592,6 +629,7 @@ def quick_chat_with_memory(
         messages: List of messages to send sequentially
         system_prompt: Optional system prompt
         model: Optional model to use
+        assistant_name: Name to use for the assistant
 
     Returns:
         List of AI responses
@@ -599,6 +637,7 @@ def quick_chat_with_memory(
     config = ChatConfig(
         model=model or "Llama-3.2-3B-Instruct-Hybrid",
         system_prompt=system_prompt,
+        assistant_name=assistant_name or "assistant",
         show_stats=False,
         logging_level="WARNING",
     )

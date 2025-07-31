@@ -220,7 +220,13 @@ class GaiaCliClient:
             yield chunk
 
     def chat(
-        self, message=None, model=None, max_tokens=512, system_prompt=None, stats=False
+        self,
+        message=None,
+        model=None,
+        max_tokens=512,
+        system_prompt=None,
+        assistant_name=None,
+        stats=False,
     ):
         """Chat interface using the new ChatApp - interactive if no message, single message if message provided"""
         try:
@@ -235,6 +241,7 @@ class GaiaCliClient:
                     model=model or "Llama-3.2-3B-Instruct-Hybrid",
                     max_tokens=max_tokens,
                     system_prompt=system_prompt,
+                    assistant_name=assistant_name or "assistant",
                     show_stats=stats,
                 )
                 chat = ChatSDK(config)
@@ -245,6 +252,7 @@ class GaiaCliClient:
                     model=model or "Llama-3.2-3B-Instruct-Hybrid",
                     max_tokens=max_tokens,
                     system_prompt=system_prompt,
+                    assistant_name=assistant_name or "assistant",
                     show_stats=False,
                 )
                 chat = ChatSDK(config)
@@ -269,7 +277,11 @@ async def async_main(action, **kwargs):
 
     # Create client for all actions - exclude parameters that aren't constructor arguments
     client = GaiaCliClient(
-        **{k: v for k, v in kwargs.items() if k not in ["message", "stats"]}
+        **{
+            k: v
+            for k, v in kwargs.items()
+            if k not in ["message", "stats", "assistant_name"]
+        }
     )
 
     if action == "prompt":
@@ -294,6 +306,7 @@ async def async_main(action, **kwargs):
             model=kwargs.get("model", "Llama-3.2-3B-Instruct-Hybrid"),
             max_tokens=kwargs.get("max_tokens", 512),
             system_prompt=kwargs.get("system_prompt"),
+            assistant_name=kwargs.get("assistant_name", "assistant"),
             show_stats=kwargs.get("stats", False),
             logging_level=kwargs.get("logging_level", "INFO"),
         )
@@ -417,7 +430,11 @@ def main():
         help="Maximum tokens to generate (default: 512)",
     )
     chat_parser.add_argument("--system-prompt", help="Custom system prompt to use")
-
+    chat_parser.add_argument(
+        "--assistant-name",
+        default="gaia",
+        help="Name to use for the assistant (default: gaia)",
+    )
     chat_parser.add_argument(
         "--stats", action="store_true", help="Show performance statistics"
     )

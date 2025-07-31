@@ -193,6 +193,7 @@ gaia chat [MESSAGE] [OPTIONS]
 - `--model`: Model name to use (default: Llama-3.2-3B-Instruct-Hybrid)
 - `--max-tokens`: Maximum tokens to generate (default: 512)
 - `--system-prompt`: Custom system prompt for the conversation
+- `--assistant-name`: Name to use for the assistant (default: "assistant")
 - `--stats`: Show performance statistics (single message mode only)
 
 **Examples:**
@@ -206,8 +207,11 @@ gaia chat "What is machine learning?"
 # Use specific model with custom system prompt for single message
 gaia chat "Help me code" --system-prompt "You are a helpful coding assistant"
 
-# Interactive mode with custom settings
-gaia chat --max-tokens 1000 --model Llama-3.2-3B-Instruct-Hybrid
+# Use custom assistant name
+gaia chat "Hello" --assistant-name "Gaia"
+
+# Interactive mode with custom settings and assistant name
+gaia chat --max-tokens 1000 --model Llama-3.2-3B-Instruct-Hybrid --assistant-name "Gaia"
 ```
 
 **Interactive Commands:**

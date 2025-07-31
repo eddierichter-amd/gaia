@@ -29,6 +29,7 @@ async def demo_basic_chat():
 
     config = ChatConfig(
         model="Llama-3.2-3B-Instruct-Hybrid",
+        assistant_name="Gaia",  # Custom assistant name
         show_stats=True,
         max_history_length=3,  # Keep 3 conversation pairs
         logging_level="INFO",
@@ -47,7 +48,7 @@ async def demo_basic_chat():
         print(f"\nTurn {i}")
         print(f"User: {message}")
         response = chat.send(message)
-        print(f"AI: {response.text}")
+        print(f"Gaia: {response.text}")
 
         if response.stats and i == len(messages):  # Show stats on last message
             print(f"Stats: {response.stats}")
@@ -59,7 +60,11 @@ async def demo_streaming_chat():
     """Demo streaming chat functionality."""
     print("\n=== Streaming Chat Demo ===")
 
-    config = ChatConfig(model="Llama-3.2-3B-Instruct-Hybrid", show_stats=True)
+    config = ChatConfig(
+        model="Llama-3.2-3B-Instruct-Hybrid",
+        assistant_name="StreamBot",
+        show_stats=True,
+    )
     chat = ChatSDK(config)
 
     # First establish context
@@ -68,7 +73,7 @@ async def demo_streaming_chat():
     print(
         "User: Can you explain neural networks in simple terms, based on what you know about my interests?"
     )
-    print("AI: ", end="", flush=True)
+    print("StreamBot: ", end="", flush=True)
 
     for chunk in chat.send_stream(
         "Can you explain neural networks in simple terms, based on what you know about my interests?"
@@ -85,20 +90,27 @@ async def demo_simple_chat():
     """Demo the SimpleChat API."""
     print("\n=== Simple Chat Demo ===")
 
-    chat = SimpleChat(system_prompt="You are a helpful programming assistant.")
-
-    # Conversation with memory
+    # Show both default and custom assistant names
+    print("--- Default Assistant Name ---")
+    chat1 = SimpleChat(system_prompt="You are a helpful programming assistant.")
     print("User: I'm working on a Python project")
-    response1 = chat.ask("I'm working on a Python project")
-    print(f"AI: {response1}")
+    response1 = chat1.ask("I'm working on a Python project")
+    print(f"Assistant: {response1}")
 
-    print("\nUser: Can you help me with error handling?")
-    response2 = chat.ask("Can you help me with error handling?")
-    print(f"AI: {response2}")
+    print("\n--- Custom Assistant Name ---")
+    chat2 = SimpleChat(
+        system_prompt="You are a helpful programming assistant.",
+        assistant_name="CodeHelper",
+    )
+    print("User: Can you help me with error handling?")
+    response2 = chat2.ask("Can you help me with error handling?")
+    print(f"CodeHelper: {response2}")
 
     # Show conversation history
-    conversation = chat.get_conversation()
+    conversation = chat2.get_conversation()
     print(f"\nConversation history: {len(conversation)} entries")
+    if conversation:
+        print("Sample entry:", conversation[0])
 
 
 async def demo_chat_sessions():
@@ -108,16 +120,18 @@ async def demo_chat_sessions():
     # Create session manager
     sessions = ChatSession()
 
-    # Create different themed sessions
+    # Create different themed sessions with custom assistant names
     work_chat = sessions.create_session(
         "work",
         system_prompt="You are a professional business assistant.",
+        assistant_name="WorkBot",
         max_history_length=2,
     )
 
     casual_chat = sessions.create_session(
         "casual",
         system_prompt="You are a friendly, casual conversation partner.",
+        assistant_name="Buddy",
         max_history_length=2,
     )
 
@@ -125,13 +139,13 @@ async def demo_chat_sessions():
     print("=== Work Session ===")
     print("User: I need to write a project proposal")
     work_response = work_chat.send("I need to write a project proposal")
-    print(f"Work AI: {work_response.text}")
+    print(f"WorkBot: {work_response.text}")
 
     # Chat in casual context
     print("\n=== Casual Session ===")
     print("User: I need to write a project proposal")
     casual_response = casual_chat.send("I need to write a project proposal")
-    print(f"Casual AI: {casual_response.text}")
+    print(f"Buddy: {casual_response.text}")
 
     print(f"\nActive sessions: {sessions.list_sessions()}")
 
@@ -145,7 +159,7 @@ async def demo_quick_functions():
     response = quick_chat("What's the capital of France?")
     print(f"AI: {response}")
 
-    # Multi-turn with memory
+    # Multi-turn with memory and custom assistant name
     print("\n=== Multi-turn Quick Chat ===")
     messages = [
         "I have a pet dog named Max",
@@ -153,10 +167,10 @@ async def demo_quick_functions():
         "What kind of animal is Max?",
     ]
 
-    responses = quick_chat_with_memory(messages)
+    responses = quick_chat_with_memory(messages, assistant_name="QuickBot")
     for msg, resp in zip(messages, responses):
         print(f"User: {msg}")
-        print(f"AI: {resp}")
+        print(f"QuickBot: {resp}")
 
 
 async def demo_configuration():
@@ -176,17 +190,19 @@ async def demo_configuration():
     response1 = chat.send("How are you today?")
     print(f"AI: {response1.text}")
 
-    # Update configuration dynamically
+    # Update configuration dynamically including assistant name
     chat.update_config(
         system_prompt="You are now a serious, professional assistant.",
+        assistant_name="Professional",
         max_history_length=1,
     )
 
     print("\nUser: How are you today? (after config change)")
     response2 = chat.send("How are you today?")
-    print(f"AI: {response2.text}")
+    print(f"Professional: {response2.text}")
 
     print(f"\nHistory length after config change: {chat.history_length}")
+    print(f"Current assistant name: {chat.config.assistant_name}")
 
 
 def print_integration_examples():
@@ -214,11 +230,35 @@ for chunk in chat.send_stream("Tell me a story"):
     print(chunk.text, end="", flush=True)
 ```
 
+Assistant Naming:
+```python
+from gaia.agents.chat.sdk import ChatSDK, ChatConfig
+
+# Create SDK with custom assistant name
+config = ChatConfig(
+    model="Llama-3.2-3B-Instruct-Hybrid",
+    assistant_name="Gaia"
+)
+chat = ChatSDK(config)
+
+response = chat.send("What's your name?")
+print(f"Gaia: {response.text}")
+
+# Interactive session will show "Gaia:" instead of "Assistant:"
+await chat.start_interactive_session()
+```
+
 Simple Integration:
 ```python
 from gaia.agents.chat.sdk import SimpleChat
 
+# Default assistant name
 chat = SimpleChat()
+response = chat.ask("What's the weather?")
+print(response)
+
+# Custom assistant name
+chat = SimpleChat(assistant_name="Helper")
 response = chat.ask("What's the weather?")
 print(response)
 ```
@@ -228,8 +268,16 @@ Session Management:
 from gaia.agents.chat.sdk import ChatSession
 
 sessions = ChatSession()
-work_chat = sessions.create_session("work", system_prompt="Professional assistant")
-personal_chat = sessions.create_session("personal", system_prompt="Friendly companion")
+work_chat = sessions.create_session(
+    "work",
+    system_prompt="Professional assistant",
+    assistant_name="WorkBot"
+)
+personal_chat = sessions.create_session(
+    "personal",
+    system_prompt="Friendly companion",
+    assistant_name="Buddy"
+)
 
 work_response = work_chat.send("Draft an email")
 personal_response = personal_chat.send("What's for dinner?")
@@ -239,14 +287,14 @@ Quick One-off Usage:
 ```python
 from gaia.agents.chat.sdk import quick_chat, quick_chat_with_memory
 
-# Single message
-response = await quick_chat("Hello!")
+# Single message with custom assistant name
+response = quick_chat("Hello!", assistant_name="Gaia")
 
-# Multi-turn conversation
-responses = await quick_chat_with_memory([
+# Multi-turn conversation with custom assistant name
+responses = quick_chat_with_memory([
     "My name is John",
     "What's my name?"
-])
+], assistant_name="Gaia")
 ```
 """
     )

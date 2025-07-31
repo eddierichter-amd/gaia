@@ -41,10 +41,14 @@ gaia chat --model Llama-3.2-1B-Instruct-awq-g128-int4-asym-fp16-onnx-hybrid
 
 # Set custom system prompt
 gaia chat --system-prompt "You are a helpful coding assistant"
+
+# Use custom assistant name
+gaia chat --assistant-name "Gaia"
 ```
 
 **Key features:**
 - **Conversation History**: Maintains context across messages with configurable history length
+- **Assistant Naming**: Customize the assistant's name for personalized interactions
 - **Interactive Commands**: Built-in commands for session management and debugging
 - **Streaming Responses**: Real-time response streaming for better user experience
 - **Model Flexibility**: Support for different LLM models with automatic prompt formatting

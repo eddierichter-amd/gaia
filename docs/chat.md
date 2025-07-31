@@ -7,6 +7,7 @@ The Gaia Chat SDK provides a unified, programmable interface for integrating tex
 - [Quick Start](#quick-start)
 - [Core Classes](#core-classes)
 - [Usage Examples](#usage-examples)
+- [Assistant Naming](#assistant-naming)
 - [CLI Integration](#cli-integration)
 - [Advanced Features](#advanced-features)
 - [API Reference](#api-reference)
@@ -58,6 +59,7 @@ class ChatConfig:
     show_stats: bool = False
     logging_level: str = "INFO"
     use_local_llm: bool = True
+    assistant_name: str = "assistant"  # Name to use for the assistant in conversations
 ```
 
 ### ChatResponse
@@ -134,23 +136,106 @@ print()  # Newline after complete response
 ```python
 from gaia.agents.chat.sdk import SimpleChat
 
-# Ultra-simple interface
+# Ultra-simple interface with default assistant name
 chat = SimpleChat()
-
 response = chat.ask("What's the weather like?")
 print(response)
 
-# With custom system prompt
+# With custom system prompt and assistant name
 professional_chat = SimpleChat(
-    system_prompt="You are a professional business assistant."
+    system_prompt="You are a professional business assistant.",
+    assistant_name="BusinessBot"
 )
-
 response = professional_chat.ask("Draft a meeting agenda")
 print(response)
 
 # Streaming version
 for chunk in chat.ask_stream("Tell me about Python"):
     print(chunk, end="", flush=True)
+```
+
+## Assistant Naming
+
+The Chat SDK supports customizable assistant names, allowing you to personalize the AI's identity in conversations and interactive sessions.
+
+### Basic Assistant Naming
+
+```python
+from gaia.agents.chat.sdk import ChatSDK, ChatConfig
+
+# Create chat with custom assistant name
+config = ChatConfig(
+    model="Llama-3.2-3B-Instruct-Hybrid",
+    assistant_name="Gaia"
+)
+chat = ChatSDK(config)
+
+response = chat.send("What's your name?")
+print(f"Gaia: {response.text}")
+
+# Interactive session will display "Gaia:" instead of "Assistant:"
+await chat.start_interactive_session()
+```
+
+### Different Assistant Names for Different Contexts
+
+```python
+from gaia.agents.chat.sdk import ChatSDK, ChatConfig
+
+# Code helper
+code_config = ChatConfig(
+    assistant_name="CodeBot",
+    system_prompt="You are an expert programming assistant."
+)
+code_chat = ChatSDK(code_config)
+
+# Creative helper
+creative_config = ChatConfig(
+    assistant_name="Muse", 
+    system_prompt="You are a creative writing assistant."
+)
+creative_chat = ChatSDK(creative_config)
+
+# Each has distinct identity
+code_response = code_chat.send("Help me debug this Python function")
+creative_response = creative_chat.send("Help me write a short story")
+
+print(f"CodeBot: {code_response.text}")
+print(f"Muse: {creative_response.text}")
+```
+
+### Assistant Names in Conversation History
+
+```python
+chat = ChatSDK(ChatConfig(assistant_name="Helper"))
+
+chat.send("Hello!")
+chat.send("How are you?")
+
+# History maintains assistant name
+history = chat.get_formatted_history()
+for entry in history:
+    print(f"{entry['role']}: {entry['message']}")
+# Output:
+# user: Hello!
+# Helper: Hi there! I'm doing well, thank you for asking!
+# user: How are you?
+# Helper: I'm doing great! How can I help you today?
+```
+
+### Dynamic Assistant Name Changes
+
+```python
+chat = ChatSDK(ChatConfig(assistant_name="Bot"))
+
+response1 = chat.send("Hello")
+print(f"Bot: {response1.text}")
+
+# Change assistant name dynamically
+chat.update_config(assistant_name="Gaia")
+
+response2 = chat.send("What's your name now?")
+print(f"Gaia: {response2.text}")
 ```
 
 ### Session Management
@@ -161,20 +246,25 @@ from gaia.agents.chat.sdk import ChatSession
 # Create session manager
 sessions = ChatSession()
 
-# Create different chat sessions with different contexts
+# Create different chat sessions with different contexts and assistant names
 work_chat = sessions.create_session(
     "work", 
-    system_prompt="You are a professional assistant for workplace tasks."
+    system_prompt="You are a professional assistant for workplace tasks.",
+    assistant_name="WorkBot"
 )
 
 personal_chat = sessions.create_session(
     "personal", 
-    system_prompt="You are a friendly companion for casual conversation."
+    system_prompt="You are a friendly companion for casual conversation.",
+    assistant_name="Buddy"
 )
 
 # Chat in different contexts
 work_response = work_chat.send("Draft an email to my team about the project update")
 personal_response = personal_chat.send("What's a good recipe for dinner?")
+
+print(f"WorkBot: {work_response.text}")
+print(f"Buddy: {personal_response.text}")
 
 # Sessions maintain separate conversation histories
 print(f"Work chat history: {work_chat.get_formatted_history()}")
@@ -193,15 +283,19 @@ from gaia.agents.chat.sdk import quick_chat, quick_chat_with_memory
 response = quick_chat("What is machine learning?")
 print(response)
 
-# Multi-turn conversation with memory
+# With custom assistant name
+response = quick_chat("What is machine learning?", assistant_name="Expert")
+print(response)
+
+# Multi-turn conversation with memory and custom assistant name
 responses = quick_chat_with_memory([
     "My name is John and I live in Seattle",
     "What's my name?",
     "Where do I live?"
-])
+], assistant_name="Helper")
 
 for i, response in enumerate(responses, 1):
-    print(f"Response {i}: {response}")
+    print(f"Helper Response {i}: {response}")
 ```
 
 ### Interactive Chat Session
@@ -275,7 +369,8 @@ chat = ChatSDK()
 chat.update_config(
     max_tokens=1000,
     show_stats=True,
-    max_history_length=10
+    max_history_length=10,
+    assistant_name="UpdatedBot"  # Change assistant name dynamically
 )
 ```
 
@@ -290,7 +385,8 @@ chat.send("How are you?")
 
 # Get raw history
 history = chat.get_history()
-print(history)  # ['user: Hello', 'assistant: ...', 'user: How are you?', 'assistant: ...']
+print(history)  # ['user: Hello', 'assistant: ...', 'user: How are you?' 'assistant: ...']
+# Note: Assistant name in history reflects the configured name
 
 # Get formatted history
 formatted = chat.get_formatted_history()
@@ -370,6 +466,7 @@ except Exception as e:
 
 ### SimpleChat Methods
 
+- `__init__(system_prompt: Optional[str] = None, model: Optional[str] = None, assistant_name: Optional[str] = None)` - Initialize with optional assistant name
 - `ask(question: str) -> str` - Ask question and get response
 - `ask_stream(question: str)` - Ask question and get streaming response
 - `clear_memory() -> None` - Clear conversation memory
@@ -378,6 +475,7 @@ except Exception as e:
 ### ChatSession Methods
 
 - `create_session(session_id: str, config: Optional[ChatConfig] = None, **config_kwargs) -> ChatSDK`
+  - `config_kwargs` supports `assistant_name`, `system_prompt`, `model`, etc.
 - `get_session(session_id: str) -> Optional[ChatSDK]`
 - `delete_session(session_id: str) -> bool`
 - `list_sessions() -> List[str]`
@@ -385,8 +483,8 @@ except Exception as e:
 
 ### Utility Functions
 
-- `quick_chat(message: str, system_prompt: Optional[str] = None, model: Optional[str] = None) -> str`
-- `quick_chat_with_memory(messages: List[str], system_prompt: Optional[str] = None, model: Optional[str] = None) -> List[str]`
+- `quick_chat(message: str, system_prompt: Optional[str] = None, model: Optional[str] = None, assistant_name: Optional[str] = None) -> str`
+- `quick_chat_with_memory(messages: List[str], system_prompt: Optional[str] = None, model: Optional[str] = None, assistant_name: Optional[str] = None) -> List[str]`
 
 ## Best Practices
 
@@ -401,6 +499,8 @@ except Exception as e:
 5. **Resource Cleanup**: Clear sessions and history when no longer needed to free memory.
 
 6. **Model Selection**: Choose appropriate models based on your performance and accuracy requirements.
+
+7. **Assistant Naming**: Use meaningful assistant names to create distinct identities for different use cases (e.g., "CodeBot" for programming, "Writer" for creative tasks).
 
 ## Examples Repository
 
