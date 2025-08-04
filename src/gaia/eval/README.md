@@ -366,10 +366,18 @@ The system uses sophisticated evaluation criteria combining quantitative and qua
 - **Hard failure**: Automatic fail if correctness rating is "poor" regardless of other scores
 
 ### Overall Ratings
-- **Excellent**: Pass rate ≥90%, Mean similarity ≥0.8
-- **Good**: Pass rate ≥80%, Mean similarity ≥0.7
-- **Fair**: Pass rate ≥60%, Mean similarity ≥0.6
-- **Poor**: Below fair thresholds
+- **Excellent**: Pass rate ≥90%, Mean similarity ≥0.8 (100% quality score)
+- **Good**: Pass rate ≥80%, Mean similarity ≥0.7 (66.7% quality score)
+- **Fair**: Pass rate ≥60%, Mean similarity ≥0.6 (33.3% quality score)  
+- **Poor**: Below fair thresholds (0% quality score)
+
+Quality scores are displayed as percentages with qualitative labels:
+- **85-100% (Excellent)** = Predominantly excellent ratings
+- **67-84% (Good)** = Predominantly good ratings  
+- **34-66% (Fair)** = Predominantly fair ratings
+- **0-33% (Poor)** = Predominantly poor ratings
+
+The percentage represents the weighted average of all ratings, converted to a 0-100% scale for intuitive understanding.
 
 ## Example Workflow
 

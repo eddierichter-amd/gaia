@@ -791,17 +791,17 @@ Examples:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Evaluate single RAG results file
-  gaia eval -f ./output/templates/introduction.template.json
+  # Evaluate single experiment file
+  gaia eval -f ./experiments/emails/customer_support_email.Claude-Sonnet-Basic-Summary.experiment.json
 
-  # Evaluate all JSON files in a directory
+  # Evaluate all experiment files in a directory (hierarchical structure supported)
   gaia eval -d ./experiments -o ./evaluation
 
   # Evaluate with custom output directory
-  gaia eval -f ./output/rag/results.json -o ./output/eval
+  gaia eval -f ./experiments/my_experiment.experiment.json -o ./evaluation
 
   # Evaluate summarization results with separate groundtruth file
-  gaia eval -f ./output/experiments/summary.experiment.json -g ./output/groundtruth/transcript.summarization.groundtruth.json
+  gaia eval -f ./experiments/meetings/design_review_meeting.Claude-Sonnet-Basic-Summary.experiment.json -g ./groundtruth/meetings/design_review_meeting.summarization.groundtruth.json
 
   # Evaluate directory with specific Claude model
   gaia eval -d ./experiments -m claude-3-opus-20240229
@@ -829,8 +829,8 @@ Examples:
         "-o",
         "--output-dir",
         type=str,
-        default="./output/eval",
-        help="Output directory for evaluation report (default: ./output/eval)",
+        default="./evaluation",
+        help="Output directory for evaluation report (default: ./evaluation)",
     )
     eval_parser.add_argument(
         "-m",
@@ -944,6 +944,16 @@ Examples:
         default="localhost",
         help="Host address for the visualizer server (default: localhost)",
     )
+    visualize_parser.add_argument(
+        "--test-data-dir",
+        type=str,
+        help="Directory containing test data files (default: ./test_data)",
+    )
+    visualize_parser.add_argument(
+        "--groundtruth-dir",
+        type=str,
+        help="Directory containing groundtruth files (default: ./groundtruth)",
+    )
 
     # Add new subparser for generating synthetic test data
     generate_parser = subparsers.add_parser(
@@ -980,23 +990,26 @@ Examples:
   gaia batch-experiment --create-config-from-groundtruth ./output/groundtruth/meeting.qa.groundtruth.json
 
   # Run batch experiments on transcript directory
-  gaia batch-experiment -c experiment_config.json -i ./transcripts -o ./output/experiments
+  gaia batch-experiment -c experiment_config.json -i ./transcripts -o ./experiments
 
   # Run batch experiments on transcript directory with custom queries from groundtruth
-  gaia batch-experiment -c experiment_config.json -i ./transcripts -q ./output/groundtruth/meeting.qa.groundtruth.json -o ./output/experiments
+  gaia batch-experiment -c experiment_config.json -i ./transcripts -q ./groundtruth/meeting.qa.groundtruth.json -o ./experiments
 
   # Run batch experiments on single transcript file
-  gaia batch-experiment -c experiment_config.json -i ./meeting_transcript.txt -o ./output/experiments
+  gaia batch-experiment -c experiment_config.json -i ./meeting_transcript.txt -o ./experiments
 
   # Run batch experiments on groundtruth file
-  gaia batch-experiment -c experiment_config.json -i ./output/groundtruth/transcript.qa.groundtruth.json -o ./output/experiments
+  gaia batch-experiment -c experiment_config.json -i ./groundtruth/transcript.qa.groundtruth.json -o ./experiments
+
+  # Run batch experiments on consolidated groundtruth file
+  gaia batch-experiment -c experiment_config.json -i ./groundtruth/consolidated_summarization_groundtruth.json -o ./experiments
 
   # Run with custom delay between requests to avoid rate limiting
-  gaia batch-experiment -c experiment_config.json -i ./transcripts -o ./output/experiments --delay 2.0
+  gaia batch-experiment -c experiment_config.json -i ./transcripts -o ./experiments --delay 2.0
 
   # Process multiple experiment results
-  gaia eval -f ./output/experiments/Claude-Sonnet-Standard.experiment.json
-  gaia report -d ./output/experiments
+  gaia eval -f ./experiments/Claude-Sonnet-Standard.experiment.json
+  gaia report -d ./experiments
         """,
     )
 
@@ -1644,21 +1657,25 @@ Let me know your answer!
 
             # Handle directory processing
             if args.directory:
-                import glob
-
-                # Find all JSON files in the directory
-                json_pattern = os.path.join(args.directory, "*.json")
-                json_files = glob.glob(json_pattern)
+                # Find all experiment JSON files in the directory (recursively)
+                experiment_dir = Path(args.directory)
+                json_files = list(experiment_dir.rglob("*.experiment.json"))
 
                 if not json_files:
-                    print(f"❌ No JSON files found in directory: {args.directory}")
+                    print(
+                        f"❌ No .experiment.json files found in directory: {args.directory}"
+                    )
                     return
+
+                # Convert to strings for compatibility
+                json_files = [str(f) for f in json_files]
 
                 print(f"Found {len(json_files)} JSON files to process")
 
                 total_files_processed = 0
                 total_usage = {"total_tokens": 0}
                 total_cost = {"total_cost": 0.0}
+                evaluation_files = []  # Track evaluation files for consolidated report
 
                 for json_file in sorted(json_files):
                     print(f"\n📄 Processing: {os.path.basename(json_file)}")
@@ -1668,7 +1685,13 @@ Let me know your answer!
                             results_path=json_file,
                             output_dir=output_dir,
                             groundtruth_path=getattr(args, "groundtruth", None),
+                            base_experiment_dir=str(experiment_dir),
                         )
+
+                        if output_dir and evaluation_data:
+                            # Track evaluation files for consolidated report
+                            eval_file_path = Path(json_file).stem + ".eval.json"
+                            evaluation_files.append(eval_file_path)
 
                         total_files_processed += 1
 
@@ -1716,6 +1739,15 @@ Let me know your answer!
 
                 if not args.summary_only and total_files_processed > 0:
                     print(f"  Detailed Reports: {args.output_dir}")
+
+                    # Create consolidated evaluation report
+                    if len(evaluation_files) > 1:
+                        consolidated_report_path = (
+                            evaluator.create_consolidated_evaluation_report(
+                                evaluation_files, args.output_dir, str(experiment_dir)
+                            )
+                        )
+                        print(f"  Consolidated Report: {consolidated_report_path}")
 
                 # Print total cost information
                 if total_usage["total_tokens"] > 0:
@@ -2194,6 +2226,14 @@ def handle_visualize_command(args):
         if args.evaluations_dir
         else workspace_dir / "evaluation"
     )
+    test_data_dir = (
+        Path(args.test_data_dir) if args.test_data_dir else workspace_dir / "test_data"
+    )
+    groundtruth_dir = (
+        Path(args.groundtruth_dir)
+        if args.groundtruth_dir
+        else workspace_dir / "groundtruth"
+    )
 
     # Get the webapp directory
     webapp_dir = Path(__file__).parent / "eval" / "webapp"
@@ -2247,11 +2287,15 @@ def handle_visualize_command(args):
     env["PORT"] = str(args.port)
     env["EXPERIMENTS_PATH"] = str(experiments_dir.absolute())
     env["EVALUATIONS_PATH"] = str(evaluations_dir.absolute())
+    env["TEST_DATA_PATH"] = str(test_data_dir.absolute())
+    env["GROUNDTRUTH_PATH"] = str(groundtruth_dir.absolute())
 
     print("🚀 Starting evaluation results visualizer...")
     print(f"   Workspace: {workspace_dir.absolute()}")
     print(f"   Experiments: {experiments_dir.absolute()}")
     print(f"   Evaluations: {evaluations_dir.absolute()}")
+    print(f"   Test Data: {test_data_dir.absolute()}")
+    print(f"   Groundtruth: {groundtruth_dir.absolute()}")
     print(f"   Server: http://{args.host}:{args.port}")
 
     # Start the Node.js server

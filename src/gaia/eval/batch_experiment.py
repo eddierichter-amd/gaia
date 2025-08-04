@@ -322,6 +322,11 @@ class BatchExperimentRunner:
         """Load data from various input sources: groundtruth files, transcript files, or directories."""
         input_path = Path(input_path)
 
+        self.log.info(f"Loading data from source: {input_path}, type={experiment_type}")
+        self.log.info(
+            f"Input path exists: {input_path.exists()}, is_file: {input_path.is_file()}, suffix: {input_path.suffix}"
+        )
+
         try:
             if input_path.is_file():
                 if input_path.suffix == ".json":
@@ -385,11 +390,38 @@ class BatchExperimentRunner:
     def _load_from_groundtruth_file(
         self, groundtruth_file: str, experiment_type: str
     ) -> List[Dict]:
-        """Load data from a groundtruth JSON file."""
+        """Load data from a groundtruth JSON file (individual or consolidated)."""
+        self.log.info(
+            f"Loading groundtruth file: {groundtruth_file} for experiment type: {experiment_type}"
+        )
+
         with open(groundtruth_file, "r", encoding="utf-8") as f:
             groundtruth_data = json.load(f)
 
         analysis = groundtruth_data.get("analysis", {})
+        metadata = groundtruth_data.get("metadata", {})
+
+        # Check if this is a consolidated groundtruth file
+        is_consolidated = "consolidated_from" in metadata or "source_files" in metadata
+
+        self.log.info(f"Metadata keys: {list(metadata.keys())}")
+        self.log.info(f"Is consolidated: {is_consolidated}")
+
+        if is_consolidated:
+            return self._load_from_consolidated_groundtruth(
+                groundtruth_data, experiment_type
+            )
+        else:
+            return self._load_from_individual_groundtruth(
+                groundtruth_data, experiment_type
+            )
+
+    def _load_from_individual_groundtruth(
+        self, groundtruth_data: Dict, experiment_type: str
+    ) -> List[Dict]:
+        """Load data from an individual groundtruth file."""
+        analysis = groundtruth_data.get("analysis", {})
+        metadata = groundtruth_data.get("metadata", {})
 
         if experiment_type == "qa":
             # Extract QA pairs from groundtruth
@@ -424,7 +456,6 @@ class BatchExperimentRunner:
                 )
 
             # Get the source transcript content
-            metadata = groundtruth_data.get("metadata", {})
             source_file = metadata.get("source_file", "")
 
             # Read transcript content
@@ -445,6 +476,150 @@ class BatchExperimentRunner:
                     "source_file": source_file,
                 }
             ]
+
+            return data
+
+        else:
+            raise ValueError(f"Unsupported experiment type: {experiment_type}")
+
+    def _load_from_consolidated_groundtruth(
+        self, groundtruth_data: Dict, experiment_type: str
+    ) -> List[Dict]:
+        """Load data from a consolidated groundtruth file."""
+        analysis = groundtruth_data.get("analysis", {})
+        metadata = groundtruth_data.get("metadata", {})
+
+        self.log.info(
+            f"Loading consolidated groundtruth for experiment type: {experiment_type}"
+        )
+        self.log.info(f"Metadata keys: {list(metadata.keys())}")
+        self.log.info(f"Analysis keys: {list(analysis.keys())}")
+
+        if experiment_type == "qa":
+            # For consolidated QA files, extract QA pairs from all items
+            data = []
+
+            # Check if analysis contains direct qa_pairs
+            if "qa_pairs" in analysis:
+                qa_pairs = analysis["qa_pairs"]
+                for qa_pair in qa_pairs:
+                    data.append(
+                        {
+                            "type": "qa",
+                            "query": qa_pair.get("query", qa_pair.get("question", "")),
+                            "ground_truth": qa_pair.get(
+                                "response", qa_pair.get("answer", "")
+                            ),
+                        }
+                    )
+
+            # Also check for nested structure (qa_pairs within individual summaries)
+            summaries = analysis.get("summaries", {})
+            for item_id, item_data in summaries.items():
+                if "qa_pairs" in item_data:
+                    for qa_pair in item_data["qa_pairs"]:
+                        data.append(
+                            {
+                                "type": "qa",
+                                "query": qa_pair.get(
+                                    "query", qa_pair.get("question", "")
+                                ),
+                                "ground_truth": qa_pair.get(
+                                    "response", qa_pair.get("answer", "")
+                                ),
+                                "source_item": item_id,
+                            }
+                        )
+
+            if not data:
+                raise ValueError(
+                    "No QA pairs found in consolidated groundtruth file for QA experiment"
+                )
+
+            return data
+
+        elif experiment_type == "summarization":
+            # For consolidated summarization files, create separate items for each source
+            summaries = analysis.get("summaries", {})
+
+            self.log.info(f"Found {len(summaries)} summaries in consolidated file")
+
+            if not summaries:
+                raise ValueError(
+                    "No summaries found in consolidated groundtruth file for summarization experiment"
+                )
+
+            data = []
+            source_files_info = metadata.get("source_files", [])
+
+            self.log.info(f"Found {len(source_files_info)} source files in metadata")
+
+            # Create a mapping of transcript_id to source file info
+            source_file_map = {}
+            for source_info in source_files_info:
+                transcript_id = source_info.get("transcript_id", "")
+                source_file_map[transcript_id] = source_info
+                self.log.info(
+                    f"Mapped transcript_id '{transcript_id}' to source file '{source_info.get('source_file', '')}'"
+                )
+
+            self.log.info(
+                f"Created source file map with {len(source_file_map)} entries"
+            )
+
+            for item_id, item_summaries in summaries.items():
+                # Get source file information
+                source_info = source_file_map.get(item_id, {})
+                source_file = source_info.get("source_file", "")
+
+                self.log.info(
+                    f"Processing item {item_id}, source file: '{source_file}'"
+                )
+
+                if not source_file:
+                    self.log.warning(
+                        f"No source file found for item {item_id}, skipping"
+                    )
+                    continue
+
+                # Normalize path separators for current platform
+                source_file = source_file.replace("\\", "/")
+                source_path = Path(source_file)
+
+                self.log.info(
+                    f"Normalized source path: '{source_path}', exists: {source_path.exists()}"
+                )
+
+                # Read transcript content
+                if not source_path.exists():
+                    self.log.warning(
+                        f"Source transcript file not found: {source_path}, skipping {item_id}"
+                    )
+                    continue
+
+                with open(source_path, "r", encoding="utf-8") as f:
+                    transcript_content = f.read().strip()
+
+                if not transcript_content:
+                    self.log.warning(
+                        f"Empty transcript file: {source_path}, skipping {item_id}"
+                    )
+                    continue
+
+                data.append(
+                    {
+                        "type": "summarization",
+                        "transcript": transcript_content,
+                        "groundtruth_summaries": item_summaries,
+                        "source_file": str(source_path),
+                        "item_id": item_id,
+                    }
+                )
+
+            if not data:
+                raise ValueError(
+                    "No valid data items found in consolidated groundtruth file for summarization experiment"
+                )
 
             return data
 
@@ -500,8 +675,8 @@ class BatchExperimentRunner:
         """Load data from a directory of transcript files."""
         transcript_dir = Path(transcript_dir)
 
-        # Find all text files in directory
-        transcript_files = list(transcript_dir.glob("*.txt"))
+        # Find all text files in directory (recursively)
+        transcript_files = list(transcript_dir.rglob("*.txt"))
         if not transcript_files:
             raise ValueError(f"No .txt files found in directory: {transcript_dir}")
 
@@ -780,23 +955,158 @@ class BatchExperimentRunner:
         elif experiment.experiment_type == "summarization":
             output_data["analysis"]["summarization_results"] = results
 
-        # Save results to file
-        output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
+        # Determine output structure based on data items
+        output_base_path = Path(output_dir)
+        output_base_path.mkdir(parents=True, exist_ok=True)
 
         # Generate safe filename from experiment name
         safe_name = "".join(
             c for c in experiment.name if c.isalnum() or c in (" ", "-", "_")
         ).rstrip()
         safe_name = safe_name.replace(" ", "_")
-        result_filename = f"{safe_name}.experiment.json"
-        result_path = output_path / result_filename
 
-        with open(result_path, "w", encoding="utf-8") as f:
-            json.dump(output_data, f, indent=2)
+        # Check if we have multiple items with individual source files (hierarchical structure needed)
+        has_individual_items = any(
+            "source_file" in result for result in results if isinstance(result, dict)
+        )
+        has_item_ids = any(
+            "item_id" in data_item
+            for data_item in data_items
+            if isinstance(data_item, dict)
+        )
 
-        self.log.info(f"Experiment results saved to: {result_path}")
-        return str(result_path)
+        if has_individual_items or has_item_ids:
+            # Create hierarchical structure - save individual files and consolidated
+            individual_files = self._save_individual_experiment_files(
+                output_data, data_items, results, output_base_path, safe_name
+            )
+
+            # Create consolidated file at root
+            consolidated_filename = f"{safe_name}.experiment.json"
+            consolidated_path = output_base_path / consolidated_filename
+
+            # Add consolidation metadata
+            output_data["metadata"]["consolidated_from"] = len(individual_files)
+            output_data["metadata"]["individual_files"] = individual_files
+
+            with open(consolidated_path, "w", encoding="utf-8") as f:
+                json.dump(output_data, f, indent=2)
+
+            self.log.info(
+                f"Consolidated experiment results saved to: {consolidated_path}"
+            )
+            self.log.info(f"Individual experiment files: {len(individual_files)}")
+
+            return str(consolidated_path)
+        else:
+            # Single file output (traditional behavior)
+            result_filename = f"{safe_name}.experiment.json"
+            result_path = output_base_path / result_filename
+
+            with open(result_path, "w", encoding="utf-8") as f:
+                json.dump(output_data, f, indent=2)
+
+            self.log.info(f"Experiment results saved to: {result_path}")
+            return str(result_path)
+
+    def _save_individual_experiment_files(
+        self,
+        base_output_data: Dict,
+        data_items: List[Dict],
+        results: List[Dict],
+        output_base_path: Path,
+        safe_experiment_name: str,
+    ) -> List[str]:
+        """Save individual experiment files maintaining directory hierarchy."""
+        individual_files = []
+
+        for i, (data_item, result) in enumerate(zip(data_items, results)):
+            # Determine output path based on source file or item_id
+            if "item_id" in data_item:
+                # From consolidated groundtruth - use item_id to determine path
+                item_id = data_item["item_id"]
+                # Create directory structure like emails/file_name or meetings/file_name
+                if "/" in item_id:
+                    relative_dir = item_id.split("/")[0] if "/" in item_id else ""
+                    file_base = item_id.split("/")[-1] if "/" in item_id else item_id
+                else:
+                    # Guess directory from item_id pattern
+                    if "email" in item_id.lower():
+                        relative_dir = "emails"
+                    elif "meeting" in item_id.lower():
+                        relative_dir = "meetings"
+                    else:
+                        relative_dir = "misc"
+                    file_base = item_id
+            elif "source_file" in data_item:
+                # From individual files - extract relative path from source file
+                source_file = Path(data_item["source_file"])
+                if "test_data" in source_file.parts:
+                    # Extract relative path from test_data structure
+                    test_data_index = source_file.parts.index("test_data")
+                    relative_parts = source_file.parts[test_data_index + 1 :]
+                    if len(relative_parts) > 1:
+                        relative_dir = "/".join(relative_parts[:-1])
+                        file_base = source_file.stem
+                    else:
+                        relative_dir = ""
+                        file_base = source_file.stem
+                else:
+                    relative_dir = ""
+                    file_base = source_file.stem
+            else:
+                # Fallback - no hierarchical structure
+                relative_dir = ""
+                file_base = f"item_{i+1}"
+
+            # Create individual output data
+            individual_output_data = {
+                "metadata": base_output_data["metadata"].copy(),
+                "analysis": {},
+            }
+
+            # Adjust metadata for individual file
+            individual_output_data["metadata"]["total_items"] = 1
+            individual_output_data["metadata"]["source_item"] = data_item.get(
+                "item_id", ""
+            )
+            individual_output_data["metadata"]["source_file"] = data_item.get(
+                "source_file", ""
+            )
+
+            # Add single result to analysis
+            if base_output_data["metadata"]["experiment_type"] == "qa":
+                if "qa_results" in result:
+                    individual_output_data["analysis"]["transcript_qa_results"] = [
+                        result
+                    ]
+                else:
+                    individual_output_data["analysis"]["qa_results"] = [result]
+            elif base_output_data["metadata"]["experiment_type"] == "summarization":
+                individual_output_data["analysis"]["summarization_results"] = [result]
+
+            # Create output directory and file
+            if relative_dir:
+                output_dir = output_base_path / relative_dir
+                output_dir.mkdir(parents=True, exist_ok=True)
+            else:
+                output_dir = output_base_path
+
+            individual_filename = f"{file_base}.{safe_experiment_name}.experiment.json"
+            individual_path = output_dir / individual_filename
+
+            with open(individual_path, "w", encoding="utf-8") as f:
+                json.dump(individual_output_data, f, indent=2)
+
+            # Store relative path for consolidation metadata
+            if relative_dir:
+                relative_path = f"{relative_dir}/{individual_filename}"
+            else:
+                relative_path = individual_filename
+
+            individual_files.append(relative_path)
+
+        return individual_files
 
     def run_all_experiments(
         self,
@@ -838,7 +1148,90 @@ class BatchExperimentRunner:
         self.log.info(
             f"Completed {len(result_files)} out of {len(self.experiments)} experiments"
         )
+
+        # Create consolidated experiments report at root level
+        if len(result_files) > 1:
+            consolidated_report_path = self._create_consolidated_experiments_report(
+                result_files, output_dir, input_path
+            )
+            self.log.info(
+                f"Consolidated experiments report saved to: {consolidated_report_path}"
+            )
+
         return result_files
+
+    def _create_consolidated_experiments_report(
+        self, result_files: List[str], output_dir: str, input_path: str
+    ) -> str:
+        """Create a consolidated report of all experiments."""
+        output_base_path = Path(output_dir)
+
+        # Load all experiment results
+        all_experiments = []
+        total_usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+        total_cost = {"input_cost": 0.0, "output_cost": 0.0, "total_cost": 0.0}
+
+        for result_file in result_files:
+            try:
+                with open(result_file, "r", encoding="utf-8") as f:
+                    experiment_data = json.load(f)
+
+                experiment_info = {
+                    "experiment_name": experiment_data["metadata"]["experiment_name"],
+                    "experiment_type": experiment_data["metadata"]["experiment_type"],
+                    "model": experiment_data["metadata"]["model"],
+                    "llm_type": experiment_data["metadata"]["llm_type"],
+                    "file_path": str(Path(result_file).relative_to(output_base_path)),
+                    "timestamp": experiment_data["metadata"]["timestamp"],
+                    "total_items": experiment_data["metadata"]["total_items"],
+                    "usage": experiment_data["metadata"]["total_usage"],
+                    "cost": experiment_data["metadata"]["total_cost"],
+                    "individual_files": experiment_data["metadata"].get(
+                        "individual_files", []
+                    ),
+                    "consolidated_from": experiment_data["metadata"].get(
+                        "consolidated_from", 0
+                    ),
+                }
+
+                all_experiments.append(experiment_info)
+
+                # Accumulate totals
+                for key in total_usage:
+                    total_usage[key] += experiment_data["metadata"]["total_usage"].get(
+                        key, 0
+                    )
+                for key in total_cost:
+                    total_cost[key] += experiment_data["metadata"]["total_cost"].get(
+                        key, 0.0
+                    )
+
+            except Exception as e:
+                self.log.error(f"Error loading experiment file {result_file}: {e}")
+                continue
+
+        # Create consolidated report
+        consolidated_report = {
+            "metadata": {
+                "report_type": "consolidated_experiments",
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "input_source": input_path,
+                "output_directory": output_dir,
+                "total_experiments": len(all_experiments),
+                "total_usage": total_usage,
+                "total_cost": total_cost,
+            },
+            "experiments": all_experiments,
+        }
+
+        # Save consolidated report
+        consolidated_filename = "consolidated_experiments_report.json"
+        consolidated_path = output_base_path / consolidated_filename
+
+        with open(consolidated_path, "w", encoding="utf-8") as f:
+            json.dump(consolidated_report, f, indent=2)
+
+        return str(consolidated_path)
 
     def create_sample_config(self, output_path: str):
         """Create a sample configuration file."""
@@ -1042,16 +1435,19 @@ Examples:
   python -m gaia.eval.batch_experiment --create-sample-config experiment_config.json
 
   # Run batch experiments on transcript directory
-  python -m gaia.eval.batch_experiment -c experiment_config.json -i ./transcripts -o ./output/experiments
+  python -m gaia.eval.batch_experiment -c experiment_config.json -i ./transcripts -o ./experiments
 
   # Run batch experiments on transcript directory with custom queries from groundtruth
-  python -m gaia.eval.batch_experiment -c experiment_config.json -i ./transcripts -q ./output/groundtruth/meeting.qa.groundtruth.json -o ./output/experiments
+  python -m gaia.eval.batch_experiment -c experiment_config.json -i ./transcripts -q ./groundtruth/meeting.qa.groundtruth.json -o ./experiments
 
   # Run batch experiments on groundtruth file
-  python -m gaia.eval.batch_experiment -c experiment_config.json -i ./output/groundtruth/transcript.qa.groundtruth.json -o ./output/experiments
+  python -m gaia.eval.batch_experiment -c experiment_config.json -i ./groundtruth/transcript.qa.groundtruth.json -o ./experiments
+
+  # Run batch experiments on consolidated groundtruth file
+  python -m gaia.eval.batch_experiment -c experiment_config.json -i ./groundtruth/consolidated_summarization_groundtruth.json -o ./experiments
 
   # Run with custom delay between requests
-  python -m gaia.eval.batch_experiment -c experiment_config.json -i ./transcripts -o ./output/experiments --delay 2.0
+  python -m gaia.eval.batch_experiment -c experiment_config.json -i ./transcripts -o ./experiments --delay 2.0
         """,
     )
 
@@ -1074,8 +1470,8 @@ Examples:
         "-o",
         "--output-dir",
         type=str,
-        default="./output/experiments",
-        help="Output directory for experiment results (default: ./output/experiments)",
+        default="./experiments",
+        help="Output directory for experiment results (default: ./experiments)",
     )
     parser.add_argument(
         "--delay",

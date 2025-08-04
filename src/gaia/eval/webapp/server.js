@@ -14,6 +14,8 @@ app.use(express.json());
 // Base paths for data files - use environment variables or defaults
 const EXPERIMENTS_PATH = process.env.EXPERIMENTS_PATH || path.join(__dirname, '../../../..', 'experiments');
 const EVALUATIONS_PATH = process.env.EVALUATIONS_PATH || path.join(__dirname, '../../../..', 'evaluation');
+const TEST_DATA_PATH = process.env.TEST_DATA_PATH || path.join(__dirname, '../../../..', 'test_data');
+const GROUNDTRUTH_PATH = process.env.GROUNDTRUTH_PATH || path.join(__dirname, '../../../..', 'groundtruth');
 
 // API endpoint to list available files
 app.get('/api/files', (req, res) => {
@@ -108,6 +110,151 @@ app.get('/api/report/:experimentFile/:evaluationFile?', (req, res) => {
     }
 });
 
+// API endpoint to list test data directories and files
+app.get('/api/test-data', (req, res) => {
+    try {
+        const testData = { directories: [], files: [] };
+        
+        if (!fs.existsSync(TEST_DATA_PATH)) {
+            return res.json(testData);
+        }
+
+        const entries = fs.readdirSync(TEST_DATA_PATH, { withFileTypes: true });
+        
+        for (const entry of entries) {
+            if (entry.isDirectory()) {
+                const dirPath = path.join(TEST_DATA_PATH, entry.name);
+                const dirFiles = fs.readdirSync(dirPath, { withFileTypes: true });
+                
+                const txtFiles = dirFiles
+                    .filter(file => file.isFile() && file.name.endsWith('.txt'))
+                    .map(file => file.name);
+                
+                const hasMetadata = dirFiles.some(file => 
+                    file.isFile() && file.name.endsWith('_metadata.json')
+                );
+
+                testData.directories.push({
+                    name: entry.name,
+                    path: dirPath,
+                    files: txtFiles,
+                    hasMetadata: hasMetadata
+                });
+            }
+        }
+
+        res.json(testData);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to list test data', details: error.message });
+    }
+});
+
+// API endpoint to load test data file content
+app.get('/api/test-data/:type/:filename', (req, res) => {
+    try {
+        const type = req.params.type;
+        const filename = req.params.filename;
+        const filePath = path.join(TEST_DATA_PATH, type, filename);
+        
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'Test data file not found' });
+        }
+
+        const content = fs.readFileSync(filePath, 'utf8');
+        res.json({ 
+            filename: filename,
+            type: type,
+            content: content 
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to load test data file', details: error.message });
+    }
+});
+
+// API endpoint to load test data metadata
+app.get('/api/test-data/:type/metadata', (req, res) => {
+    try {
+        const type = req.params.type;
+        const metadataFiles = [
+            `${type}_metadata.json`,
+            'metadata.json'
+        ];
+        
+        let metadataPath = null;
+        for (const filename of metadataFiles) {
+            const potentialPath = path.join(TEST_DATA_PATH, type, filename);
+            if (fs.existsSync(potentialPath)) {
+                metadataPath = potentialPath;
+                break;
+            }
+        }
+        
+        if (!metadataPath) {
+            return res.status(404).json({ error: 'Metadata file not found' });
+        }
+
+        const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+        res.json(metadata);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to load metadata', details: error.message });
+    }
+});
+
+// API endpoint to list groundtruth files
+app.get('/api/groundtruth', (req, res) => {
+    try {
+        const groundtruthData = { directories: [], files: [] };
+        
+        if (!fs.existsSync(GROUNDTRUTH_PATH)) {
+            return res.json(groundtruthData);
+        }
+
+        // Function to recursively find groundtruth files
+        function findGroundtruthFiles(dir, relativePath = '') {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            
+            for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name);
+                const relativeFilePath = relativePath ? path.join(relativePath, entry.name) : entry.name;
+                
+                if (entry.isDirectory()) {
+                    findGroundtruthFiles(fullPath, relativeFilePath);
+                } else if (entry.isFile() && entry.name.endsWith('.groundtruth.json')) {
+                    groundtruthData.files.push({
+                        name: entry.name,
+                        path: relativeFilePath,
+                        directory: relativePath || 'root',
+                        type: entry.name.includes('consolidated') ? 'consolidated' : 'individual'
+                    });
+                }
+            }
+        }
+
+        findGroundtruthFiles(GROUNDTRUTH_PATH);
+        
+        res.json(groundtruthData);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to list groundtruth files', details: error.message });
+    }
+});
+
+// API endpoint to load groundtruth file content
+app.get('/api/groundtruth/:filename(*)', (req, res) => {
+    try {
+        const filename = req.params.filename;
+        const filePath = path.join(GROUNDTRUTH_PATH, filename);
+        
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'Groundtruth file not found' });
+        }
+
+        const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to load groundtruth file', details: error.message });
+    }
+});
+
 // Serve the main application
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -117,4 +264,6 @@ app.listen(PORT, () => {
     console.log(`Gaia Evaluation Visualizer running on http://localhost:${PORT}`);
     console.log(`Experiments path: ${EXPERIMENTS_PATH}`);
     console.log(`Evaluations path: ${EVALUATIONS_PATH}`);
+    console.log(`Test data path: ${TEST_DATA_PATH}`);
+    console.log(`Groundtruth path: ${GROUNDTRUTH_PATH}`);
 }); 

@@ -981,12 +981,17 @@ Topics Discussed: {groundtruth_summaries.get('topics_discussed', [])}
                             "poor_count": poor_count,
                             "quality_score": (
                                 (
-                                    excellent_count * 4
-                                    + good_count * 3
-                                    + fair_count * 2
-                                    + poor_count * 1
+                                    (
+                                        excellent_count * 4
+                                        + good_count * 3
+                                        + fair_count * 2
+                                        + poor_count * 1
+                                    )
+                                    / total_summaries
+                                    - 1  # Convert from 1-4 scale to 0-3 scale
                                 )
-                                / total_summaries
+                                * 100
+                                / 3  # Convert to percentage (0-100%)
                                 if total_summaries > 0
                                 else 0
                             ),
@@ -1016,6 +1021,7 @@ Topics Discussed: {groundtruth_summaries.get('topics_discussed', [])}
         results_path: str,
         output_dir: Optional[str] = None,
         groundtruth_path: Optional[str] = None,
+        base_experiment_dir: Optional[str] = None,
     ) -> None:
         """
         Generate a detailed evaluation report including Claude's analysis.
@@ -1047,8 +1053,26 @@ Topics Discussed: {groundtruth_summaries.get('topics_discussed', [])}
             }
 
             if output_dir:
-                results_filename = Path(results_path).name
-                json_path = output_path / f"{Path(results_filename).stem}.eval.json"
+                results_path_obj = Path(results_path)
+                results_filename = results_path_obj.name
+
+                # Preserve directory hierarchy if base_experiment_dir is provided
+                if base_experiment_dir:
+                    base_exp_path = Path(base_experiment_dir)
+                    try:
+                        # Calculate relative path from base experiment directory
+                        relative_path = results_path_obj.relative_to(base_exp_path)
+                        # Create the same directory structure in output
+                        eval_subdir = output_path / relative_path.parent
+                        eval_subdir.mkdir(parents=True, exist_ok=True)
+                        json_path = eval_subdir / f"{results_path_obj.stem}.eval.json"
+                    except ValueError:
+                        # If results_path is not relative to base_experiment_dir, use flat structure
+                        json_path = output_path / f"{results_path_obj.stem}.eval.json"
+                else:
+                    # Flat structure (original behavior)
+                    json_path = output_path / f"{results_path_obj.stem}.eval.json"
+
                 with open(json_path, "w") as f:
                     json.dump(evaluation_data, f, indent=2)
                 self.log.info(f"Evaluation data saved to: {json_path}")
@@ -1134,6 +1158,85 @@ Topics Discussed: {groundtruth_summaries.get('topics_discussed', [])}
             self.log.error(f"Error creating template: {e}")
             raise
 
+    def create_consolidated_evaluation_report(
+        self, evaluation_files: List[str], output_dir: str, base_experiment_dir: str
+    ) -> str:
+        """Create a consolidated report of all evaluations."""
+        from datetime import datetime
+
+        output_base_path = Path(output_dir)
+
+        # Load all evaluation results
+        all_evaluations = []
+        total_usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+        total_cost = {"input_cost": 0.0, "output_cost": 0.0, "total_cost": 0.0}
+
+        for eval_file in evaluation_files:
+            # Find the actual evaluation file (could be in subdirectory)
+            eval_paths = list(output_base_path.rglob(eval_file))
+            if not eval_paths:
+                self.log.warning(f"Evaluation file not found: {eval_file}")
+                continue
+
+            eval_path = eval_paths[0]  # Take first match
+
+            try:
+                with open(eval_path, "r", encoding="utf-8") as f:
+                    evaluation_data = json.load(f)
+
+                eval_info = {
+                    "experiment_name": eval_path.stem.replace(".eval", ""),
+                    "file_path": str(eval_path.relative_to(output_base_path)),
+                    "timestamp": evaluation_data.get("metadata", {}).get(
+                        "timestamp", ""
+                    ),
+                    "model": evaluation_data.get("metadata", {}).get("model", ""),
+                    "overall_rating": evaluation_data.get("overall_rating", {}),
+                    "original_results_file": evaluation_data.get("metadata", {}).get(
+                        "original_results_file", ""
+                    ),
+                    "usage": evaluation_data.get("total_usage", {}),
+                    "cost": evaluation_data.get("total_cost", {}),
+                }
+
+                all_evaluations.append(eval_info)
+
+                # Accumulate totals
+                usage = evaluation_data.get("total_usage", {})
+                for key in total_usage:
+                    total_usage[key] += usage.get(key, 0)
+
+                cost = evaluation_data.get("total_cost", {})
+                for key in total_cost:
+                    total_cost[key] += cost.get(key, 0.0)
+
+            except Exception as e:
+                self.log.error(f"Error loading evaluation file {eval_path}: {e}")
+                continue
+
+        # Create consolidated report
+        consolidated_report = {
+            "metadata": {
+                "report_type": "consolidated_evaluations",
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "experiment_directory": base_experiment_dir,
+                "output_directory": output_dir,
+                "total_evaluations": len(all_evaluations),
+                "total_usage": total_usage,
+                "total_cost": total_cost,
+            },
+            "evaluations": all_evaluations,
+        }
+
+        # Save consolidated report
+        consolidated_filename = "consolidated_evaluations_report.json"
+        consolidated_path = output_base_path / consolidated_filename
+
+        with open(consolidated_path, "w", encoding="utf-8") as f:
+            json.dump(consolidated_report, f, indent=2)
+
+        return str(consolidated_path)
+
     def _detect_evaluation_type(self, models_data: List[Dict]) -> str:
         """Detect whether this is a RAG or summarization evaluation based on the data structure."""
         if not models_data:
@@ -1197,13 +1300,14 @@ Topics Discussed: {groundtruth_summaries.get('topics_discussed', [])}
 
             total_summaries = excellent_count + good_count + fair_count + poor_count
             if total_summaries > 0:
-                quality_score = (
+                quality_score_raw = (
                     excellent_count * 4
                     + good_count * 3
                     + fair_count * 2
                     + poor_count * 1
                 ) / total_summaries
-                ranking.append(f"**{model['name']}** ({quality_score:.1f}/4.0)")
+                quality_score_percentage = ((quality_score_raw - 1) / 3) * 100
+                ranking.append(f"**{model['name']}** ({quality_score_percentage:.1f}%)")
 
         ranking_text = " > ".join(ranking)
 
@@ -1429,8 +1533,8 @@ Performance ranking: {ranking_text}
             if not eval_path.exists():
                 raise FileNotFoundError(f"Evaluation directory not found: {eval_dir}")
 
-            # Find all .eval.json files
-            eval_files = list(eval_path.glob("*.eval.json"))
+            # Find all .eval.json files (recursively)
+            eval_files = list(eval_path.rglob("*.eval.json"))
             if not eval_files:
                 raise FileNotFoundError(f"No .eval.json files found in {eval_dir}")
 

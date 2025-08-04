@@ -68,8 +68,7 @@ pip install .[eval]
 # Set up Claude API for synthetic data generation
 export ANTHROPIC_API_KEY=your_key_here
 
-# Optional: Install Lemonade server for local LLM testing
-pip install lemonade-server
+# Optional: Start Lemonade for local LLM processing if not running
 lemonade-server serve
 ```
 
@@ -83,10 +82,7 @@ Generate realistic test scenarios for evaluation purposes.
 
 ```bash
 # Generate meeting transcripts with full options
-gaia generate --meeting-transcript -o ./test_data/meetings \
-  --meeting-types standup planning design_review client_call performance_review all_hands budget_planning product_roadmap \
-  --count-per-type 3 \
-  --target-tokens 2000
+gaia generate --meeting-transcript -o ./test_data/meetings --meeting-types standup planning design_review --count-per-type 1 --target-tokens 1000
 ```
 
 **Available meeting types:**
@@ -103,10 +99,7 @@ gaia generate --meeting-transcript -o ./test_data/meetings \
 
 ```bash
 # Generate business emails with full options
-gaia generate --email -o ./test_data/emails \
-  --email-types project_update meeting_request customer_support sales_outreach internal_announcement technical_discussion vendor_communication performance_feedback \
-  --count-per-type 2 \
-  --target-tokens 1500
+gaia generate --email -o ./test_data/emails --email-types project_update meeting_request customer_support --count-per-type 1 --target-tokens 1000
 ```
 
 **Available email types:**
@@ -140,9 +133,9 @@ gaia groundtruth -d ./test_data -p "*.txt" --use-case email -o ./groundtruth
 Run systematic model comparisons.
 
 ```bash
-# Create and run batch experiments
+# Create and run batch experiments, can also use your own config, see ./src/gaia/eval/configs for examples.
 gaia batch-experiment --create-sample-config experiment_config.json
-gaia batch-experiment -c experiment_config.json -i ./test_data -o ./results
+gaia batch-experiment -c experiment_config.json -i ./groundtruth/consolidated_summarization_groundtruth.json -o ./experiments
 ```
 
 **Sample configuration structure:**
@@ -181,7 +174,7 @@ Analyze experiment results and generate reports.
 
 ```bash
 # Evaluate results and generate reports
-gaia eval -d ./results -o ./evaluation
+gaia eval -d ./experiments -o ./evaluation
 gaia report -d ./evaluation -o ./reports/report.md
 
 # Launch interactive web visualizer for comparing results
@@ -293,11 +286,11 @@ The visualizer provides a user-friendly interface to:
 ### Launch the Visualizer
 
 ```bash
-# Launch with default settings (looks for ./experiments and ./evaluation directories)
+# Launch with default settings (looks for ./experiments, ./evaluation, ./test_data, and ./groundtruth directories)
 gaia visualize
 
 # Specify custom data directories
-gaia visualize --experiments-dir ./my_results --evaluations-dir ./my_evaluations
+gaia visualize --experiments-dir ./my_results --evaluations-dir ./my_evaluations --test-data-dir ./my_test_data --groundtruth-dir ./my_groundtruth
 
 # Launch on different port or host
 gaia visualize --port 8080 --host 0.0.0.0 --no-browser
@@ -308,6 +301,8 @@ gaia visualize --port 8080 --host 0.0.0.0 --no-browser
 **Data Loading:**
 - Automatically discovers `.experiment.json` files in the experiments directory
 - Loads corresponding `.experiment.eval.json` files from the evaluations directory
+- Displays test data files (emails, meeting transcripts) with generation metadata and costs
+- Shows groundtruth files with evaluation criteria, expected summaries, and generation details
 - Real-time file system monitoring for new results
 
 **Comparison Interface:**
@@ -338,8 +333,8 @@ gaia batch-experiment -c config.json -i ./test_data -o ./experiments
 # 4. Evaluate results
 gaia eval -d ./experiments -o ./evaluation
 
-# 5. Launch visualizer for interactive analysis
-gaia visualize --experiments-dir ./experiments --evaluations-dir ./evaluation
+# 5. Launch visualizer for interactive analysis (includes test data and groundtruth)
+gaia visualize --experiments-dir ./experiments --evaluations-dir ./evaluation --test-data-dir ./test_data --groundtruth-dir ./groundtruth
 
 # 6. Generate static reports for documentation
 gaia report -d ./evaluation -o ./reports/comparison_report.md

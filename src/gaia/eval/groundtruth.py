@@ -254,9 +254,32 @@ class GroundTruthGenerator:
             if output_dir:
                 output_dir = Path(output_dir)
                 output_dir.mkdir(parents=True, exist_ok=True)
-                output_path = (
-                    output_dir / f"{file_path.stem}.{use_case.value}.groundtruth.json"
-                )
+
+                # If file_path is relative and has parent directories, preserve them
+                if file_path.is_relative_to(Path.cwd()) and file_path.parent != Path(
+                    "."
+                ):
+                    # Try to preserve relative directory structure
+                    try:
+                        relative_path = file_path.relative_to(Path.cwd())
+                        relative_dir = relative_path.parent
+                        output_subdir = output_dir / relative_dir
+                        output_subdir.mkdir(parents=True, exist_ok=True)
+                        output_path = (
+                            output_subdir
+                            / f"{file_path.stem}.{use_case.value}.groundtruth.json"
+                        )
+                    except ValueError:
+                        # Fall back to flat structure if relative path calculation fails
+                        output_path = (
+                            output_dir
+                            / f"{file_path.stem}.{use_case.value}.groundtruth.json"
+                        )
+                else:
+                    output_path = (
+                        output_dir
+                        / f"{file_path.stem}.{use_case.value}.groundtruth.json"
+                    )
             else:
                 output_path = file_path.with_suffix(
                     f".{use_case.value}.groundtruth.json"
@@ -297,22 +320,53 @@ class GroundTruthGenerator:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Remove output_dir from kwargs to avoid individual file saves
+        # Remove output_dir from kwargs to avoid individual file saves in the generate method
         generate_kwargs = {k: v for k, v in kwargs.items() if k != "output_dir"}
 
         results = []
         individual_files = []
 
-        for file_path in input_dir.glob(file_pattern):
+        # Collect all matching files recursively
+        matching_files = list(input_dir.rglob(file_pattern))
+        self.log.info(
+            f"Found {len(matching_files)} files matching pattern '{file_pattern}' in {input_dir}"
+        )
+
+        if not matching_files:
+            self.log.warning(
+                f"No files found matching pattern '{file_pattern}' in {input_dir}"
+            )
+            # List directory contents for debugging
+            try:
+                all_files = list(input_dir.rglob("*"))
+                self.log.info(
+                    f"All files in directory: {[str(f) for f in all_files[:10]]}"
+                )  # Show first 10
+            except Exception as e:
+                self.log.error(f"Error listing directory contents: {e}")
+
+        for match in matching_files:
+            self.log.info(f"  Found: {match}")
+
+        for file_path in matching_files:
             self.log.info(f"Processing file: {file_path}")
             try:
                 # Generate without saving individual files by not passing output_dir
                 result = self.generate(file_path, use_case=use_case, **generate_kwargs)
                 results.append(result)
 
+                # Calculate relative path from input_dir to preserve directory structure
+                relative_path = file_path.relative_to(input_dir)
+                relative_dir = relative_path.parent
+
+                # Create output directory structure
+                output_subdir = output_dir / relative_dir
+                output_subdir.mkdir(parents=True, exist_ok=True)
+
                 # Keep track of what would be the individual file path for consolidation
                 individual_file_path = (
-                    output_dir / f"{file_path.stem}.{use_case.value}.groundtruth.json"
+                    output_subdir
+                    / f"{file_path.stem}.{use_case.value}.groundtruth.json"
                 )
 
                 # Save individual file temporarily for consolidation process
@@ -346,15 +400,11 @@ class GroundTruthGenerator:
                 file_pattern=consolidated_file_pattern,
             )
 
-            # Clean up individual files after consolidation
-            for individual_file in individual_files:
-                try:
-                    individual_file.unlink()
-                    self.log.debug(f"Removed individual file: {individual_file}")
-                except OSError as e:
-                    self.log.warning(
-                        f"Could not remove individual file {individual_file}: {e}"
-                    )
+            # Keep individual files - don't clean them up
+            self.log.info(f"Individual ground truth files saved in: {output_dir}")
+            self.log.info(
+                f"Consolidated ground truth file saved as: {consolidated_output_path}"
+            )
 
             self.log.info(
                 f"Consolidated ground truth data saved to: {consolidated_output_path}"
@@ -392,7 +442,7 @@ class GroundTruthGenerator:
             raise NotADirectoryError(f"Input directory not found: {input_dir}")
 
         # Find all matching ground truth files
-        gt_files = list(input_dir.glob(file_pattern))
+        gt_files = list(input_dir.rglob(file_pattern))
         if not gt_files:
             raise FileNotFoundError(
                 f"No ground truth files found matching pattern: {file_pattern}"

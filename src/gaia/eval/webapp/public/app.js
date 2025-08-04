@@ -34,17 +34,25 @@ class EvaluationVisualizer {
     async loadAvailableFiles() {
         try {
             console.log('Loading available files...');
-            const response = await fetch('/api/files');
-            console.log('Response received:', response.status);
+            const [filesResponse, testDataResponse, groundtruthResponse] = await Promise.all([
+                fetch('/api/files'),
+                fetch('/api/test-data'),
+                fetch('/api/groundtruth')
+            ]);
             
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            console.log('Responses received:', filesResponse.status, testDataResponse.status, groundtruthResponse.status);
+            
+            if (!filesResponse.ok) {
+                throw new Error(`HTTP error! status: ${filesResponse.status}`);
             }
             
-            const data = await response.json();
-            console.log('Data received:', data);
+            const filesData = await filesResponse.json();
+            const testData = testDataResponse.ok ? await testDataResponse.json() : { directories: [] };
+            const groundtruthData = groundtruthResponse.ok ? await groundtruthResponse.json() : { files: [] };
             
-            this.populateFileSelects(data);
+            console.log('Data received:', { files: filesData, testData, groundtruthData });
+            
+            this.populateFileSelects({ ...filesData, testData, groundtruthData });
         } catch (error) {
             console.error('Failed to load available files:', error);
             this.showError('Failed to load available files');
@@ -55,8 +63,10 @@ class EvaluationVisualizer {
         console.log('Populating file selects with data:', data);
         const experimentSelect = document.getElementById('experimentSelect');
         const evaluationSelect = document.getElementById('evaluationSelect');
+        const testDataSelect = document.getElementById('testDataSelect');
+        const groundtruthSelect = document.getElementById('groundtruthSelect');
 
-        if (!experimentSelect || !evaluationSelect) {
+        if (!experimentSelect || !evaluationSelect || !testDataSelect || !groundtruthSelect) {
             console.error('Select elements not found in DOM');
             return;
         }
@@ -64,6 +74,8 @@ class EvaluationVisualizer {
         // Clear existing options
         experimentSelect.innerHTML = '';
         evaluationSelect.innerHTML = '';
+        testDataSelect.innerHTML = '';
+        groundtruthSelect.innerHTML = '';
 
         // Populate experiments
         if (data.experiments.length === 0) {
@@ -90,7 +102,45 @@ class EvaluationVisualizer {
                 evaluationSelect.appendChild(option);
             });
         }
+
+        // Populate test data
+        if (!data.testData || data.testData.directories.length === 0) {
+            testDataSelect.innerHTML = '<option disabled>No test data found</option>';
+        } else {
+            console.log(`Adding ${data.testData.directories.length} test data directories`);
+            data.testData.directories.forEach(dir => {
+                dir.files.forEach(file => {
+                    const option = document.createElement('option');
+                    option.value = `${dir.name}/${file}`;
+                    option.textContent = `${dir.name}/${file.replace('.txt', '')}`;
+                    testDataSelect.appendChild(option);
+                });
+            });
+        }
+
+        // Populate groundtruth
+        if (!data.groundtruthData || data.groundtruthData.files.length === 0) {
+            groundtruthSelect.innerHTML = '<option disabled>No groundtruth files found</option>';
+        } else {
+            console.log(`Adding ${data.groundtruthData.files.length} groundtruth files`);
+            data.groundtruthData.files.forEach(file => {
+                const option = document.createElement('option');
+                option.value = file.path;
+                const displayName = file.name
+                    .replace('.summarization.groundtruth.json', '')
+                    .replace('.qa.groundtruth.json', '')
+                    .replace('.groundtruth.json', '');
+                option.textContent = file.directory === 'root' ? displayName : `${file.directory}/${displayName}`;
+                if (file.type === 'consolidated') {
+                    option.textContent += ' [Consolidated]';
+                }
+                groundtruthSelect.appendChild(option);
+            });
+        }
         console.log('File selects populated successfully');
+        
+        // Add double-click event listeners to enable direct file loading
+        this.addDoubleClickHandlers();
     }
 
     async addSelectedReports() {
@@ -98,8 +148,10 @@ class EvaluationVisualizer {
         
         const experimentSelect = document.getElementById('experimentSelect');
         const evaluationSelect = document.getElementById('evaluationSelect');
+        const testDataSelect = document.getElementById('testDataSelect');
+        const groundtruthSelect = document.getElementById('groundtruthSelect');
 
-        if (!experimentSelect || !evaluationSelect) {
+        if (!experimentSelect || !evaluationSelect || !testDataSelect || !groundtruthSelect) {
             console.error('Select elements not found');
             alert('Error: File selection elements not found');
             return;
@@ -107,11 +159,16 @@ class EvaluationVisualizer {
 
         const selectedExperiments = Array.from(experimentSelect.selectedOptions);
         const selectedEvaluations = Array.from(evaluationSelect.selectedOptions);
+        const selectedTestData = Array.from(testDataSelect.selectedOptions);
+        const selectedGroundtruth = Array.from(groundtruthSelect.selectedOptions);
 
         console.log('Selected experiments:', selectedExperiments.length);
         console.log('Selected evaluations:', selectedEvaluations.length);
+        console.log('Selected test data:', selectedTestData.length);
+        console.log('Selected groundtruth:', selectedGroundtruth.length);
 
-        if (selectedExperiments.length === 0 && selectedEvaluations.length === 0) {
+        if (selectedExperiments.length === 0 && selectedEvaluations.length === 0 && 
+            selectedTestData.length === 0 && selectedGroundtruth.length === 0) {
             alert('Please select at least one file to load');
             return;
         }
@@ -126,11 +183,94 @@ class EvaluationVisualizer {
             await this.loadEvaluation(option.value);
         }
 
+        // Load selected test data
+        for (const option of selectedTestData) {
+            await this.loadTestData(option.value);
+        }
+
+        // Load selected groundtruth
+        for (const option of selectedGroundtruth) {
+            await this.loadGroundtruth(option.value);
+        }
+
         // Clear selections
         experimentSelect.selectedIndex = -1;
         evaluationSelect.selectedIndex = -1;
+        testDataSelect.selectedIndex = -1;
+        groundtruthSelect.selectedIndex = -1;
 
         this.updateDisplay();
+    }
+
+    addDoubleClickHandlers() {
+        const experimentSelect = document.getElementById('experimentSelect');
+        const evaluationSelect = document.getElementById('evaluationSelect');
+        const testDataSelect = document.getElementById('testDataSelect');
+        const groundtruthSelect = document.getElementById('groundtruthSelect');
+
+        if (experimentSelect) {
+            experimentSelect.addEventListener('dblclick', (e) => {
+                if (e.target.tagName === 'OPTION' && !e.target.disabled) {
+                    this.addSingleReport('experiment', e.target.value);
+                }
+            });
+        }
+
+        if (evaluationSelect) {
+            evaluationSelect.addEventListener('dblclick', (e) => {
+                if (e.target.tagName === 'OPTION' && !e.target.disabled) {
+                    this.addSingleReport('evaluation', e.target.value);
+                }
+            });
+        }
+
+        if (testDataSelect) {
+            testDataSelect.addEventListener('dblclick', (e) => {
+                if (e.target.tagName === 'OPTION' && !e.target.disabled) {
+                    this.addSingleReport('testData', e.target.value);
+                }
+            });
+        }
+
+        if (groundtruthSelect) {
+            groundtruthSelect.addEventListener('dblclick', (e) => {
+                if (e.target.tagName === 'OPTION' && !e.target.disabled) {
+                    this.addSingleReport('groundtruth', e.target.value);
+                }
+            });
+        }
+
+        console.log('Double-click handlers added to all select elements');
+    }
+
+    async addSingleReport(type, filename) {
+        console.log(`Adding single ${type} report: ${filename}`);
+        
+        try {
+            switch (type) {
+                case 'experiment':
+                    await this.loadExperiment(filename);
+                    break;
+                case 'evaluation':
+                    await this.loadEvaluation(filename);
+                    break;
+                case 'testData':
+                    await this.loadTestData(filename);
+                    break;
+                case 'groundtruth':
+                    await this.loadGroundtruth(filename);
+                    break;
+                default:
+                    console.error(`Unknown report type: ${type}`);
+                    return;
+            }
+            
+            this.updateDisplay();
+            console.log(`Successfully added ${type} report: ${filename}`);
+        } catch (error) {
+            console.error(`Failed to add ${type} report:`, error);
+            alert(`Failed to load ${type} report: ${filename}`);
+        }
     }
 
     async loadExperiment(filename) {
@@ -169,6 +309,60 @@ class EvaluationVisualizer {
         }
     }
 
+    async loadTestData(fileSpec) {
+        try {
+            const [type, filename] = fileSpec.split('/');
+            const [contentResponse, metadataResponse] = await Promise.all([
+                fetch(`/api/test-data/${type}/${filename}`),
+                fetch(`/api/test-data/${type}/metadata`)
+            ]);
+            
+            if (!contentResponse.ok) {
+                throw new Error(`Failed to load test data: ${contentResponse.status}`);
+            }
+            
+            const contentData = await contentResponse.json();
+            const metadataData = metadataResponse.ok ? await metadataResponse.json() : null;
+            
+            const reportId = `testdata-${type}-${filename.replace('.txt', '')}`;
+            this.loadedReports.set(reportId, {
+                testData: {
+                    content: contentData,
+                    metadata: metadataData,
+                    type: type,
+                    filename: filename
+                },
+                filename: fileSpec,
+                type: 'testdata'
+            });
+        } catch (error) {
+            console.error(`Failed to load test data ${fileSpec}:`, error);
+            this.showError(`Failed to load test data ${fileSpec}`);
+        }
+    }
+
+    async loadGroundtruth(filename) {
+        try {
+            const response = await fetch(`/api/groundtruth/${filename}`);
+            
+            if (!response.ok) {
+                throw new Error(`Failed to load groundtruth: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            const reportId = `groundtruth-${filename.replace(/\.(summarization|qa)\.groundtruth\.json$/, '').replace(/\//g, '-')}`;
+            this.loadedReports.set(reportId, {
+                groundtruth: data,
+                filename: filename,
+                type: 'groundtruth'
+            });
+        } catch (error) {
+            console.error(`Failed to load groundtruth ${filename}:`, error);
+            this.showError(`Failed to load groundtruth ${filename}`);
+        }
+    }
+
     updateDisplay() {
         const reportsGrid = document.getElementById('reportsGrid');
         
@@ -176,7 +370,7 @@ class EvaluationVisualizer {
             reportsGrid.innerHTML = `
                 <div class="empty-state">
                     <h3>No reports loaded</h3>
-                    <p>Select experiment and/or evaluation files to visualize results</p>
+                    <p>Select experiment, evaluation, test data, and/or groundtruth files to visualize results</p>
                 </div>
             `;
             return;
@@ -220,11 +414,23 @@ class EvaluationVisualizer {
     generateReportCard(reportId, report) {
         const hasExperiment = report.experiment !== undefined;
         const hasEvaluation = report.evaluation !== undefined;
+        const hasTestData = report.testData !== undefined;
+        const hasGroundtruth = report.groundtruth !== undefined;
         
         let title = reportId;
         let subtitle = '';
         
-        if (hasExperiment && hasEvaluation) {
+        if (hasGroundtruth) {
+            const gtFile = report.filename;
+            title = gtFile.replace(/\.(summarization|qa)\.groundtruth\.json$/, '').replace(/\//g, '/');
+            subtitle = 'Groundtruth';
+            if (gtFile.includes('consolidated')) {
+                subtitle += ' [Consolidated]';
+            }
+        } else if (hasTestData) {
+            title = `${report.testData.type}/${report.testData.filename.replace('.txt', '')}`;
+            subtitle = 'Test Data';
+        } else if (hasExperiment && hasEvaluation) {
             subtitle = 'Experiment + Evaluation';
         } else if (hasExperiment) {
             subtitle = 'Experiment Only';
@@ -240,7 +446,9 @@ class EvaluationVisualizer {
                     <button class="report-close" data-report-id="${reportId}">×</button>
                 </div>
                 <div class="report-content">
-                    ${this.generateMetricsSection(report)}
+                    ${hasGroundtruth ? this.generateGroundtruthSection(report.groundtruth) : 
+                      hasTestData ? this.generateTestDataSection(report.testData) : this.generateMetricsSection(report)}
+                    ${hasEvaluation ? this.generateEvaluationSummary(report.evaluation) : ''}
                     ${hasEvaluation ? this.generateQualitySection(report.evaluation) : ''}
                     ${hasExperiment ? this.generateExperimentDetails(report.experiment) : ''}
                     ${hasExperiment ? this.generateExperimentSummaries(report.experiment) : ''}
@@ -267,11 +475,23 @@ class EvaluationVisualizer {
             const metrics_data = evalData.overall_rating?.metrics;
             if (metrics_data) {
                 metrics.push(
-                    { label: 'Quality Score', value: metrics_data.quality_score?.toFixed(1) || 'N/A' },
+                    { label: 'Quality Score', value: metrics_data.quality_score ? this.formatQualityScore(metrics_data.quality_score) : 'N/A' },
                     { label: 'Excellent', value: metrics_data.excellent_count || 0 },
                     { label: 'Good', value: metrics_data.good_count || 0 },
                     { label: 'Fair', value: metrics_data.fair_count || 0 },
                     { label: 'Poor', value: metrics_data.poor_count || 0 }
+                );
+            }
+            
+            // Add evaluation cost and usage metrics
+            if (evalData.total_cost) {
+                metrics.push(
+                    { label: 'Eval Cost', value: `$${evalData.total_cost.total_cost?.toFixed(4) || 'N/A'}` }
+                );
+            }
+            if (evalData.total_usage) {
+                metrics.push(
+                    { label: 'Eval Tokens', value: evalData.total_usage.total_tokens?.toLocaleString() || 'N/A' }
                 );
             }
         }
@@ -292,6 +512,92 @@ class EvaluationVisualizer {
         `;
     }
 
+    formatQualityScore(score) {
+        // Handle both old (1-4 scale) and new (0-100 percentage) formats
+        let percentage;
+        if (score <= 4) {
+            // Old format: convert from 1-4 scale to percentage
+            percentage = ((score - 1) / 3) * 100;
+        } else {
+            // New format: already a percentage
+            percentage = score;
+        }
+        
+        // Add qualitative label based on percentage ranges
+        let label, cssClass;
+        if (percentage >= 85) {
+            label = 'Excellent';
+            cssClass = 'quality-excellent';
+        } else if (percentage >= 67) {
+            label = 'Good';
+            cssClass = 'quality-good';
+        } else if (percentage >= 34) {
+            label = 'Fair';
+            cssClass = 'quality-fair';
+        } else {
+            label = 'Poor';
+            cssClass = 'quality-poor';
+        }
+        
+        return `${percentage.toFixed(1)}% <span class="${cssClass}">${label}</span>`;
+    }
+
+    generateEvaluationSummary(evaluation) {
+        if (!evaluation) return '';
+
+        const hasOverallAnalysis = evaluation.overall_analysis;
+        const hasStrengths = evaluation.strengths && evaluation.strengths.length > 0;
+        const hasWeaknesses = evaluation.weaknesses && evaluation.weaknesses.length > 0;
+        const hasRecommendations = evaluation.recommendations && evaluation.recommendations.length > 0;
+        const hasUseCaseFit = evaluation.use_case_fit;
+
+        if (!hasOverallAnalysis && !hasStrengths && !hasWeaknesses && !hasRecommendations && !hasUseCaseFit) {
+            return '';
+        }
+
+        return `
+            <div class="evaluation-summary">
+                <h4>Evaluation Summary</h4>
+                ${hasOverallAnalysis ? `
+                    <div class="summary-item">
+                        <div class="summary-label">Overall Analysis</div>
+                        <div class="summary-text">${this.escapeHtml(evaluation.overall_analysis)}</div>
+                    </div>
+                ` : ''}
+                ${hasStrengths ? `
+                    <div class="summary-item">
+                        <div class="summary-label">Strengths</div>
+                        <ul class="summary-list">
+                            ${evaluation.strengths.map(strength => `<li>${this.escapeHtml(strength)}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+                ${hasWeaknesses ? `
+                    <div class="summary-item">
+                        <div class="summary-label">Weaknesses</div>
+                        <ul class="summary-list">
+                            ${evaluation.weaknesses.map(weakness => `<li>${this.escapeHtml(weakness)}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+                ${hasRecommendations ? `
+                    <div class="summary-item">
+                        <div class="summary-label">Recommendations</div>
+                        <ul class="summary-list">
+                            ${evaluation.recommendations.map(rec => `<li>${this.escapeHtml(rec)}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+                ${hasUseCaseFit ? `
+                    <div class="summary-item">
+                        <div class="summary-label">Use Case Fit</div>
+                        <div class="summary-text">${this.escapeHtml(evaluation.use_case_fit)}</div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
     generateQualitySection(evaluation) {
         if (!evaluation.per_question || evaluation.per_question.length === 0) {
             return '';
@@ -306,12 +612,12 @@ class EvaluationVisualizer {
         }
 
         const qualityItems = [
-            { label: 'Executive Summary', rating: analysis.executive_summary_quality?.rating },
-            { label: 'Detail Completeness', rating: analysis.detail_completeness?.rating },
-            { label: 'Action Items Structure', rating: analysis.action_items_structure?.rating },
-            { label: 'Key Decisions Clarity', rating: analysis.key_decisions_clarity?.rating },
-            { label: 'Participant Information', rating: analysis.participant_information?.rating },
-            { label: 'Topic Organization', rating: analysis.topic_organization?.rating }
+            { label: 'Executive Summary', rating: analysis.executive_summary_accuracy?.rating },
+            { label: 'Completeness', rating: analysis.completeness?.rating },
+            { label: 'Action Items', rating: analysis.action_items_accuracy?.rating },
+            { label: 'Key Decisions', rating: analysis.key_decisions_accuracy?.rating },
+            { label: 'Participant ID', rating: analysis.participant_identification?.rating },
+            { label: 'Topic Coverage', rating: analysis.topic_coverage?.rating }
         ].filter(item => item.rating);
 
         if (qualityItems.length === 0) {
@@ -403,12 +709,12 @@ class EvaluationVisualizer {
                 const sourceFile = item.source_file ? item.source_file.split('\\').pop().split('/').pop() : `Item ${index + 1}`;
                 
                 const explanationItems = [
-                    { key: 'executive_summary_quality', label: 'Executive Summary Quality' },
-                    { key: 'detail_completeness', label: 'Detail Completeness' },
-                    { key: 'action_items_structure', label: 'Action Items Structure' },
-                    { key: 'key_decisions_clarity', label: 'Key Decisions Clarity' },
-                    { key: 'participant_information', label: 'Participant Information' },
-                    { key: 'topic_organization', label: 'Topic Organization' }
+                    { key: 'executive_summary_accuracy', label: 'Executive Summary Accuracy' },
+                    { key: 'completeness', label: 'Completeness' },
+                    { key: 'action_items_accuracy', label: 'Action Items Accuracy' },
+                    { key: 'key_decisions_accuracy', label: 'Key Decisions Accuracy' },
+                    { key: 'participant_identification', label: 'Participant Identification' },
+                    { key: 'topic_coverage', label: 'Topic Coverage' }
                 ].filter(item => analysis[item.key] && analysis[item.key].explanation);
 
                 if (explanationItems.length > 0) {
@@ -441,6 +747,217 @@ class EvaluationVisualizer {
         });
 
         return explanationsHtml;
+    }
+
+    generateTestDataSection(testData) {
+        const { content, metadata, type, filename } = testData;
+        
+        let metadataInfo = '';
+        if (metadata) {
+            const info = metadata.generation_info || {};
+            const fileInfo = metadata[type === 'emails' ? 'emails' : 'transcripts']?.find(
+                item => item.filename === filename
+            );
+            
+            metadataInfo = `
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">${type}</div>
+                        <div class="metric-label">Type</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${fileInfo?.estimated_tokens || 'N/A'}</div>
+                        <div class="metric-label">Est. Tokens</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">$${fileInfo?.claude_cost?.total_cost?.toFixed(4) || 'N/A'}</div>
+                        <div class="metric-label">Generation Cost</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${info.claude_model || 'N/A'}</div>
+                        <div class="metric-label">Model</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        return `
+            ${metadataInfo}
+            <div class="collapsible-section">
+                <div class="collapsible-header">
+                    <h4>Content</h4>
+                    <span class="collapsible-toggle">▶</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="collapsible-body">
+                        <div class="summary-item">
+                            <div class="summary-label">${filename}</div>
+                            <div class="summary-text">${this.escapeHtml(content.content)}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            ${metadata ? this.generateTestDataMetadataSection(metadata, type) : ''}
+        `;
+    }
+
+    generateTestDataMetadataSection(metadata, type) {
+        const info = metadata.generation_info || {};
+        const items = metadata[type === 'emails' ? 'emails' : 'transcripts'] || [];
+        
+        return `
+            <div class="collapsible-section">
+                <div class="collapsible-header">
+                    <h4>Generation Metadata</h4>
+                    <span class="collapsible-toggle">▶</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="collapsible-body">
+                        <div class="detail-grid">
+                            <div><strong>Generated:</strong> ${new Date(info.generated_date).toLocaleString()}</div>
+                            <div><strong>Total Files:</strong> ${info.total_files}</div>
+                            <div><strong>Target Tokens:</strong> ${info.target_tokens_per_file}</div>
+                            <div><strong>Total Cost:</strong> $${info.total_claude_cost?.total_cost?.toFixed(4) || 'N/A'}</div>
+                            <div><strong>Total Tokens:</strong> ${info.total_claude_usage?.total_tokens || 'N/A'}</div>
+                            <div><strong>Model:</strong> ${info.claude_model}</div>
+                        </div>
+                        ${items.length > 0 ? `
+                            <h5 style="margin-top: 15px;">All ${type === 'emails' ? 'Emails' : 'Transcripts'}</h5>
+                            <div class="detail-grid">
+                                ${items.map(item => `
+                                    <div style="grid-column: 1 / -1; margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                                        <strong>${item.filename}</strong><br>
+                                        <small>${item.description}</small><br>
+                                        <small>Tokens: ${item.estimated_tokens}, Cost: $${item.claude_cost?.total_cost?.toFixed(4) || 'N/A'}</small>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    generateGroundtruthSection(groundtruth) {
+        const { metadata, analysis } = groundtruth;
+        
+        let metadataInfo = '';
+        if (metadata) {
+            metadataInfo = `
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">${metadata.use_case || 'N/A'}</div>
+                        <div class="metric-label">Use Case</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${metadata.usage?.total_tokens || 'N/A'}</div>
+                        <div class="metric-label">Total Tokens</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">$${metadata.cost?.total_cost?.toFixed(4) || 'N/A'}</div>
+                        <div class="metric-label">Generation Cost</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${metadata.model || 'N/A'}</div>
+                        <div class="metric-label">Model</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        return `
+            ${metadataInfo}
+            ${analysis?.summaries ? this.generateGroundtruthSummaries(analysis.summaries) : ''}
+            ${analysis?.evaluation_criteria ? this.generateGroundtruthCriteria(analysis.evaluation_criteria) : ''}
+            ${metadata ? this.generateGroundtruthMetadataSection(metadata, analysis) : ''}
+        `;
+    }
+
+    generateGroundtruthSummaries(summaries) {
+        return `
+            <div class="collapsible-section">
+                <div class="collapsible-header">
+                    <h4>Ground Truth Summaries</h4>
+                    <span class="collapsible-toggle">▶</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="collapsible-body">
+                        ${Object.entries(summaries).map(([key, value]) => {
+                            if (Array.isArray(value)) {
+                                return `
+                                    <div class="summary-item">
+                                        <div class="summary-label">${key.replace(/_/g, ' ').toUpperCase()}</div>
+                                        <div class="summary-text">${value.map(item => `• ${this.escapeHtml(item)}`).join('\n')}</div>
+                                    </div>
+                                `;
+                            } else {
+                                return `
+                                    <div class="summary-item">
+                                        <div class="summary-label">${key.replace(/_/g, ' ').toUpperCase()}</div>
+                                        <div class="summary-text">${this.escapeHtml(value)}</div>
+                                    </div>
+                                `;
+                            }
+                        }).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    generateGroundtruthCriteria(criteria) {
+        return `
+            <div class="collapsible-section">
+                <div class="collapsible-header">
+                    <h4>Evaluation Criteria</h4>
+                    <span class="collapsible-toggle">▶</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="collapsible-body">
+                        ${Object.entries(criteria).map(([key, value]) => `
+                            <div class="summary-item">
+                                <div class="summary-label">${key.replace(/_/g, ' ').toUpperCase()}</div>
+                                <div class="summary-text">${this.escapeHtml(value)}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    generateGroundtruthMetadataSection(metadata, analysis) {
+        return `
+            <div class="collapsible-section">
+                <div class="collapsible-header">
+                    <h4>Generation Details</h4>
+                    <span class="collapsible-toggle">▶</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="collapsible-body">
+                        <div class="detail-grid">
+                            <div><strong>Generated:</strong> ${metadata.timestamp}</div>
+                            <div><strong>Source File:</strong> ${metadata.source_file}</div>
+                            <div><strong>Model:</strong> ${metadata.model}</div>
+                            <div><strong>Use Case:</strong> ${metadata.use_case}</div>
+                            <div><strong>Input Tokens:</strong> ${metadata.usage?.input_tokens || 'N/A'}</div>
+                            <div><strong>Output Tokens:</strong> ${metadata.usage?.output_tokens || 'N/A'}</div>
+                            <div><strong>Input Cost:</strong> $${metadata.cost?.input_cost?.toFixed(4) || 'N/A'}</div>
+                            <div><strong>Output Cost:</strong> $${metadata.cost?.output_cost?.toFixed(4) || 'N/A'}</div>
+                        </div>
+                        ${analysis?.transcript_metadata ? `
+                            <h5 style="margin-top: 15px;">Content Metadata</h5>
+                            <div class="detail-grid">
+                                ${Object.entries(analysis.transcript_metadata).map(([key, value]) => `
+                                    <div><strong>${key.replace(/_/g, ' ')}:</strong> ${value}</div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     escapeHtml(text) {
