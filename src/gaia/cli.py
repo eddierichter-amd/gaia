@@ -12,7 +12,6 @@ from pathlib import Path
 import os
 
 from gaia.logger import get_logger
-from gaia.audio.audio_client import AudioClient
 from gaia.version import version
 from gaia.agents.Blender.agent import BlenderAgent
 from gaia.mcp.blender_mcp_client import MCPClient
@@ -133,11 +132,7 @@ class GaiaCliClient:
         self,
         model="Llama-3.2-3B-Instruct-Hybrid",
         max_tokens=512,
-        whisper_model_size="base",
-        audio_device_index=1,
-        silence_threshold=0.5,
         show_stats=False,
-        enable_tts=False,
         logging_level="INFO",
     ):
         self.log = self.__class__.log  # Use the class-level logger for instances
@@ -149,17 +144,8 @@ class GaiaCliClient:
         self.cli_mode = True  # Set this to True for CLI mode
         self.show_stats = show_stats
 
-        # Initialize LLM client for direct communication
+        # Initialize LLM client for local inference
         self.llm_client = LLMClient(use_local=True)
-
-        # Initialize audio client for voice functionality
-        self.audio_client = AudioClient(
-            whisper_model_size=whisper_model_size,
-            audio_device_index=audio_device_index,
-            silence_threshold=silence_threshold,
-            enable_tts=enable_tts,
-            logging_level=logging_level,
-        )
 
         self.log.debug("Gaia CLI client initialized.")
         self.log.debug(f"model: {self.model}\n max_tokens: {self.max_tokens}")
@@ -193,28 +179,6 @@ class GaiaCliClient:
             self.log.error(f"Error while fetching stats: {str(e)}")
             return None
 
-    async def start_voice_chat(self):
-        """Start a voice-based chat session."""
-        await self.audio_client.start_voice_chat(self.process_voice_input)
-
-    async def process_voice_input(self, text):
-        """Process transcribed voice input and get AI response"""
-        # Create callback for stats if needed
-        get_stats_callback = None
-        if hasattr(self, "show_stats") and self.show_stats:
-            get_stats_callback = self.get_stats
-
-        await self.audio_client.process_voice_input(text, get_stats_callback)
-
-    async def halt_generation(self):
-        """Send a request to halt the current generation."""
-        await self.audio_client.halt_generation()
-
-    async def talk(self):
-        """Voice-based chat interface"""
-        self.audio_client.initialize_tts()
-        await self.start_voice_chat()
-
     async def prompt(self, message):
         async for chunk in self.send_message(message):
             yield chunk
@@ -230,7 +194,7 @@ class GaiaCliClient:
     ):
         """Chat interface using the new ChatApp - interactive if no message, single message if message provided"""
         try:
-            from gaia.agents.chat.sdk import ChatSDK, ChatConfig
+            from gaia.chat.sdk import ChatSDK, ChatConfig
 
             # Interactive mode if no message provided, single message mode if message provided
             use_interactive = message is None
@@ -276,13 +240,16 @@ async def async_main(action, **kwargs):
             sys.exit(1)
 
     # Create client for all actions - exclude parameters that aren't constructor arguments
-    client = GaiaCliClient(
-        **{
-            k: v
-            for k, v in kwargs.items()
-            if k not in ["message", "stats", "assistant_name"]
-        }
-    )
+    # Filter out audio-related parameters that are no longer part of GaiaCliClient
+    audio_params = {
+        "whisper_model_size",
+        "audio_device_index",
+        "silence_threshold",
+        "no_tts",
+    }
+    excluded_params = {"message", "stats", "assistant_name"} | audio_params
+    client_params = {k: v for k, v in kwargs.items() if k not in excluded_params}
+    client = GaiaCliClient(**client_params)
 
     if action == "prompt":
         if not kwargs.get("message"):
@@ -299,7 +266,7 @@ async def async_main(action, **kwargs):
         return {"response": response}
     elif action == "chat":
         # Use ChatSDK for chat functionality
-        from gaia.agents.chat.sdk import ChatSDK, ChatConfig
+        from gaia.chat.sdk import ChatSDK, ChatConfig
 
         # Create SDK configuration
         config = ChatConfig(
@@ -328,7 +295,33 @@ async def async_main(action, **kwargs):
 
         return
     elif action == "talk":
-        await client.talk()
+        # Use TalkSDK for voice functionality
+        from gaia.talk.sdk import TalkSDK, TalkConfig
+
+        # Create SDK configuration from CLI arguments
+        config = TalkConfig(
+            whisper_model_size=kwargs.get("whisper_model_size", "base"),
+            audio_device_index=kwargs.get(
+                "audio_device_index", None
+            ),  # Use default device if not specified
+            silence_threshold=kwargs.get("silence_threshold", 0.5),
+            enable_tts=not kwargs.get("no_tts", False),
+            use_local_llm=True,  # Always use local LLM for CLI talk
+            system_prompt=None,  # Could add this as a parameter later
+            show_stats=kwargs.get("stats", False),
+            logging_level=kwargs.get(
+                "logging_level", "INFO"
+            ),  # Back to INFO now that issues are fixed
+        )
+
+        # Create SDK instance
+        talk_sdk = TalkSDK(config)
+
+        # Start voice chat session
+        print("Starting voice chat...")
+        print("Say 'stop' to quit or press Ctrl+C")
+
+        await talk_sdk.start_voice_session()
         log.info("Voice chat session ended.")
         return
     elif action == "stats":
@@ -462,8 +455,8 @@ def main():
     talk_parser.add_argument(
         "--audio-device-index",
         type=int,
-        default=1,
-        help="Index of the audio input device to use",
+        default=None,
+        help="Index of the audio input device to use (default: auto-detect)",
     )
     talk_parser.add_argument(
         "--whisper-model-size",
@@ -471,6 +464,17 @@ def main():
         default="base",
         choices=["tiny", "base", "small", "medium", "large"],
         help="Size of the Whisper model to use (default: base)",
+    )
+    talk_parser.add_argument(
+        "--silence-threshold",
+        type=float,
+        default=0.5,
+        help="Silence threshold in seconds (default: 0.5)",
+    )
+    talk_parser.add_argument(
+        "--stats",
+        action="store_true",
+        help="Show performance statistics during voice chat",
     )
 
     # Add summarize command
@@ -1886,7 +1890,7 @@ Let me know your answer!
     if args.action == "llm":
         try:
             # Fast import and execution - health check happens in LLMClient
-            from gaia.agents.Llm.app import main as llm
+            from gaia.apps.llm.app import main as llm
 
             response = llm(
                 query=args.query,

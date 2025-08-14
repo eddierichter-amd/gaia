@@ -14,7 +14,7 @@ from typing import List, Dict, Any
 # Add src to path for imports
 sys.path.insert(0, "src")
 
-from gaia.agents.chat.sdk import (
+from gaia.chat.sdk import (
     ChatSDK,
     ChatConfig,
     SimpleChat,
@@ -86,7 +86,11 @@ class TestChatSDKIntegration(unittest.TestCase):
         print("Testing basic ChatSDK with real LLM responses...")
 
         config = ChatConfig(
-            model=self.model, max_tokens=50, show_stats=True, logging_level="INFO"
+            model=self.model,
+            max_tokens=50,
+            show_stats=True,
+            logging_level="INFO",
+            assistant_name="assistant",
         )
         chat = ChatSDK(config)
 
@@ -150,7 +154,7 @@ class TestChatSDKIntegration(unittest.TestCase):
         """Test streaming functionality with real LLM."""
         print("Testing streaming functionality with real LLM...")
 
-        config = ChatConfig(model=self.model, max_tokens=50)
+        config = ChatConfig(model=self.model, max_tokens=50, assistant_name="assistant")
         chat = ChatSDK(config)
 
         # Test streaming response

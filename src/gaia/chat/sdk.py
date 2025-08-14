@@ -13,7 +13,7 @@ from collections import deque
 
 from gaia.logger import get_logger
 from gaia.llm.llm_client import LLMClient
-from gaia.agents.chat.prompts import Prompts
+from gaia.chat.prompts import Prompts
 
 
 @dataclass
@@ -27,7 +27,7 @@ class ChatConfig:
     show_stats: bool = False
     logging_level: str = "INFO"
     use_local_llm: bool = True
-    assistant_name: str = "assistant"  # Name to use for the assistant in conversations
+    assistant_name: str = "gaia"  # Name to use for the assistant in conversations
 
 
 @dataclass
@@ -49,7 +49,7 @@ class ChatSDK:
 
     Example usage:
         ```python
-        from gaia.agents.chat.sdk import ChatSDK, ChatConfig
+        from gaia.chat.sdk import ChatSDK, ChatConfig
 
         # Create SDK instance
         config = ChatConfig(model="Llama-3.2-3B-Instruct-Hybrid", show_stats=True)
@@ -416,7 +416,7 @@ class SimpleChat:
 
     Example usage:
         ```python
-        from gaia.agents.chat.sdk import SimpleChat
+        from gaia.chat.sdk import SimpleChat
 
         chat = SimpleChat()
 
@@ -447,7 +447,7 @@ class SimpleChat:
         config = ChatConfig(
             model=model or "Llama-3.2-3B-Instruct-Hybrid",
             system_prompt=system_prompt,
-            assistant_name=assistant_name or "assistant",
+            assistant_name=assistant_name or "gaia",
             show_stats=False,
             logging_level="WARNING",  # Minimal logging
         )
@@ -495,7 +495,7 @@ class ChatSession:
 
     Example usage:
         ```python
-        from gaia.agents.chat.sdk import ChatSession
+        from gaia.chat.sdk import ChatSession
 
         # Create session manager
         sessions = ChatSession()
@@ -606,7 +606,7 @@ def quick_chat(
     config = ChatConfig(
         model=model or "Llama-3.2-3B-Instruct-Hybrid",
         system_prompt=system_prompt,
-        assistant_name=assistant_name or "assistant",
+        assistant_name=assistant_name or "gaia",
         show_stats=False,
         logging_level="WARNING",
         max_history_length=2,  # Small history for quick chat
@@ -637,7 +637,7 @@ def quick_chat_with_memory(
     config = ChatConfig(
         model=model or "Llama-3.2-3B-Instruct-Hybrid",
         system_prompt=system_prompt,
-        assistant_name=assistant_name or "assistant",
+        assistant_name=assistant_name or "gaia",
         show_stats=False,
         logging_level="WARNING",
     )

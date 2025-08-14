@@ -5,7 +5,7 @@
 Chat agent module for interactive conversations with LLM models.
 """
 
-from gaia.agents.chat.sdk import (
+from gaia.chat.sdk import (
     ChatSDK,
     ChatConfig,
     ChatResponse,

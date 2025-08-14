@@ -19,13 +19,13 @@ The Gaia Chat SDK provides a unified, programmable interface for integrating tex
 The Chat SDK is included with Gaia. Import the components you need:
 
 ```python
-from gaia.agents.chat.sdk import ChatSDK, ChatConfig, SimpleChat
+from gaia.chat.sdk import ChatSDK, ChatConfig, SimpleChat
 ```
 
 ### Simple Usage
 
 ```python
-from gaia.agents.chat.sdk import SimpleChat
+from gaia.chat.sdk import SimpleChat
 
 # Create a simple chat instance
 chat = SimpleChat()
@@ -88,7 +88,7 @@ Session manager for handling multiple separate conversations with different cont
 ### Basic Chat with Memory
 
 ```python
-from gaia.agents.chat.sdk import ChatSDK, ChatConfig
+from gaia.chat.sdk import ChatSDK, ChatConfig
 
 # Create SDK instance with custom configuration
 config = ChatConfig(
@@ -116,7 +116,7 @@ if response3.stats:
 ### Streaming Chat
 
 ```python
-from gaia.agents.chat.sdk import ChatSDK
+from gaia.chat.sdk import ChatSDK
 
 chat = ChatSDK()
 
@@ -134,7 +134,7 @@ print()  # Newline after complete response
 ### Simple Integration
 
 ```python
-from gaia.agents.chat.sdk import SimpleChat
+from gaia.chat.sdk import SimpleChat
 
 # Ultra-simple interface with default assistant name
 chat = SimpleChat()
@@ -161,7 +161,7 @@ The Chat SDK supports customizable assistant names, allowing you to personalize 
 ### Basic Assistant Naming
 
 ```python
-from gaia.agents.chat.sdk import ChatSDK, ChatConfig
+from gaia.chat.sdk import ChatSDK, ChatConfig
 
 # Create chat with custom assistant name
 config = ChatConfig(
@@ -180,7 +180,7 @@ await chat.start_interactive_session()
 ### Different Assistant Names for Different Contexts
 
 ```python
-from gaia.agents.chat.sdk import ChatSDK, ChatConfig
+from gaia.chat.sdk import ChatSDK, ChatConfig
 
 # Code helper
 code_config = ChatConfig(
@@ -241,7 +241,7 @@ print(f"Gaia: {response2.text}")
 ### Session Management
 
 ```python
-from gaia.agents.chat.sdk import ChatSession
+from gaia.chat.sdk import ChatSession
 
 # Create session manager
 sessions = ChatSession()
@@ -277,7 +277,7 @@ print(f"Active sessions: {sessions.list_sessions()}")
 ### Quick One-off Usage
 
 ```python
-from gaia.agents.chat.sdk import quick_chat, quick_chat_with_memory
+from gaia.chat.sdk import quick_chat, quick_chat_with_memory
 
 # Single message without conversation memory
 response = quick_chat("What is machine learning?")
@@ -301,7 +301,7 @@ for i, response in enumerate(responses, 1):
 ### Interactive Chat Session
 
 ```python
-from gaia.agents.chat.sdk import ChatSDK
+from gaia.chat.sdk import ChatSDK
 import asyncio
 
 async def interactive_demo():
@@ -426,7 +426,7 @@ chat.display_stats(stats)
 ### Error Handling
 
 ```python
-from gaia.agents.chat.sdk import ChatSDK
+from gaia.chat.sdk import ChatSDK
 
 chat = ChatSDK()
 
@@ -507,7 +507,7 @@ except Exception as e:
 For more examples and integration patterns, run:
 
 ```bash
-python src/gaia/agents/chat/app.py examples
+python src/gaia/chat/app.py examples
 ```
 
 This will show additional usage patterns and integration examples.

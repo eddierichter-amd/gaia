@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch, AsyncMock
 
 from gaia.logger import get_logger
 from gaia.audio.whisper_asr import WhisperAsr
-from gaia.cli import GaiaCliClient
+from gaia.talk.sdk import TalkSDK, TalkConfig
 
 
 class TestWhisperAsr(unittest.TestCase):
@@ -80,14 +80,15 @@ class TestWhisperAsr(unittest.TestCase):
 
 
 class TestProcessAudioWrapper(unittest.TestCase):
-    """Integration tests for the process_audio_wrapper method in GaiaCliClient."""
+    """Integration tests for the process_audio_wrapper method in TalkSDK's AudioClient."""
 
     def setUp(self):
         """Set up test fixtures, including mocking necessary components."""
         self.log = get_logger(__name__)
 
-        # Create a client instance
-        self.client = GaiaCliClient()
+        # Create a TalkSDK instance (which has audio_client)
+        config = TalkConfig(enable_tts=False)  # Disable TTS for testing
+        self.client = TalkSDK(config)
 
         # Check if we're in CI environment by checking for audio devices
         try:

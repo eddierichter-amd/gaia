@@ -15,7 +15,7 @@ from typing import Dict, Any, List, Optional, Union, Literal
 from dataclasses import dataclass
 
 from gaia.logger import get_logger
-from gaia.agents.chat.sdk import ChatSDK, ChatConfig
+from gaia.chat.sdk import ChatSDK, ChatConfig
 from gaia.llm.llm_client import LLMClient
 
 

@@ -13,7 +13,7 @@ import argparse
 import sys
 import asyncio
 
-from gaia.agents.chat.sdk import (
+from gaia.chat.sdk import (
     ChatSDK,
     ChatConfig,
     SimpleChat,
@@ -215,7 +215,7 @@ def print_integration_examples():
         """
 Basic Integration:
 ```python
-from gaia.agents.chat.sdk import ChatSDK, ChatConfig
+from gaia.chat.sdk import ChatSDK, ChatConfig
 
 # Create SDK instance
 config = ChatConfig(model="Llama-3.2-3B-Instruct-Hybrid", show_stats=True)
@@ -232,7 +232,7 @@ for chunk in chat.send_stream("Tell me a story"):
 
 Assistant Naming:
 ```python
-from gaia.agents.chat.sdk import ChatSDK, ChatConfig
+from gaia.chat.sdk import ChatSDK, ChatConfig
 
 # Create SDK with custom assistant name
 config = ChatConfig(
@@ -250,7 +250,7 @@ await chat.start_interactive_session()
 
 Simple Integration:
 ```python
-from gaia.agents.chat.sdk import SimpleChat
+from gaia.chat.sdk import SimpleChat
 
 # Default assistant name
 chat = SimpleChat()
@@ -265,7 +265,7 @@ print(response)
 
 Session Management:
 ```python
-from gaia.agents.chat.sdk import ChatSession
+from gaia.chat.sdk import ChatSession
 
 sessions = ChatSession()
 work_chat = sessions.create_session(
@@ -285,7 +285,7 @@ personal_response = personal_chat.send("What's for dinner?")
 
 Quick One-off Usage:
 ```python
-from gaia.agents.chat.sdk import quick_chat, quick_chat_with_memory
+from gaia.chat.sdk import quick_chat, quick_chat_with_memory
 
 # Single message with custom assistant name
 response = quick_chat("Hello!", assistant_name="Gaia")
@@ -394,7 +394,7 @@ Demo Types:
 
     print("\n✅ Demo completed successfully!")
     print("\nTo integrate ChatSDK into your app:")
-    print("  from gaia.agents.chat.sdk import ChatSDK, ChatConfig")
+    print("  from gaia.chat.sdk import ChatSDK, ChatConfig")
     print("\nFor more examples, run: python app.py examples")
 
 
