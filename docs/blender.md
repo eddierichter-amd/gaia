@@ -123,7 +123,7 @@ gaia blender --example 3 --model "custom-model"
 gaia blender --interactive
 
 # Interactive mode with debug information
-gaiander --interactive --debug-prompts --output-dir ./blender_results
+gaia blender --interactive --debug-prompts --output-dir ./blender_results
 ```
 
 ### Custom Queries

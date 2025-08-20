@@ -5,17 +5,17 @@ Currently, the following capabilities are available, more will be added in the n
 ## Platform Support Overview
 
 - **Windows 11**: Full GUI and CLI support with all features
-- **Linux (Ubuntu/Debian)**: CLI support only (LLM Direct, Chat Agent, Evaluation tools)
+- **Linux (Ubuntu/Debian)**: Full GUI and CLI support with all features
 - **macOS**: Not supported
 
 | Use-Case Example   | Function                                 | Description                                                     | Platform Support |
 | ------------------ | ---------------------------------------- | --------------------------------------------------------------- | ---------------- |
 | LLM Direct         | Direct LLM queries via CLI               | Direct model interaction using the new `gaia llm` command      | Windows, Linux   |
 | Chat Agent         | Interactive conversations with history   | Interactive chat sessions with conversation context and commands | Windows, Linux   |
-| Blender Agent      | 3D content creation and manipulation     | Specialized agent for Blender automation and workflow          | Windows Only     |
+| Blender Agent      | 3D content creation and manipulation     | Specialized agent for Blender automation and workflow          | Windows, Linux   |
 | Summarization      | Document and transcript summarization    | AI-powered summarization with multiple output formats          | Windows, Linux   |
 | Evaluation Suite   | Model evaluation and benchmarking       | Comprehensive evaluation framework with groundtruth generation  | Windows, Linux   |
-| Voice Interaction  | Speech-to-speech conversation           | Voice-based AI interaction with TTS and ASR                    | Windows Only     |
+| Voice Interaction  | Speech-to-speech conversation           | Voice-based AI interaction with TTS and ASR                    | Windows, Linux   |
 
 ## LLM Direct Usage
 
@@ -32,7 +32,7 @@ gaia llm "Explain quantum computing" --model Llama-3.2-3B-Instruct-Hybrid --max-
 gaia llm "Write a short poem" --no-stream
 ```
 
-**Requirements**: Requires lemonade-server to be running. The command will provide helpful error messages if the server is not accessible.
+**Requirements**: Requires lemonade-server to be running. Download and install from [lemonade-server.ai](https://lemonade-server.ai/). The command will provide helpful error messages if the server is not accessible.
 
 **Platform Availability**: Windows and Linux
 
@@ -48,7 +48,7 @@ gaia chat
 gaia chat "What is machine learning?"
 
 # Use a specific model
-gaia chat --model Llama-3.2-1B-Instruct-awq-g128-int4-asym-fp16-onnx-hybrid
+gaia chat --model Llama-3.2-1B-Instruct-Hybrid
 
 # Set custom system prompt
 gaia chat --system-prompt "You are a helpful coding assistant"
@@ -106,7 +106,7 @@ gaia blender --example 2
 
 **Requirements:** In addition to the Lemonade server, the Blender agent requires a Blender MCP server to be running. See the [CLI documentation](./cli.md#blender-command) for complete setup instructions.
 
-**Platform Availability**: Windows only (Linux support planned for future releases)
+**Platform Availability**: Windows and Linux
 
 ## Summarization
 
@@ -210,7 +210,7 @@ gaia talk --audio-device-index 1 --whisper-model-size medium
 - **Device Selection**: Configure audio input devices
 - **Model Flexibility**: Choose ASR model sizes
 
-**Platform Availability**: Windows only (Linux audio support planned)
+**Platform Availability**: Windows and Linux
 
 ## Supported LLMs
 

@@ -89,7 +89,7 @@ gaia blender
 
 2. **LLM Backend Layer** (`src/gaia/llm/`): Multiple backend support
    - `lemonade_client.py`: AMD-optimized ONNX Runtime GenAI backend via Lemonade Server
-   - Supports three modes: Hybrid (NPU+iGPU), NPU-only, Generic (Ollama)
+   - Uses Lemonade Server for running LLM models with hardware optimization
    - OpenAI-compatible API with streaming support
    - Automatic server management and health checking
 
@@ -116,11 +116,9 @@ gaia blender
 - **Server Management**: Automatic startup, health checking, and cleanup of backend servers
 - **Error Recovery**: Built-in error handling and recovery mechanisms in agent conversations
 
-### Backend Modes
+### Backend Architecture
 
-1. **Hybrid Mode**: Optimal performance using NPU+iGPU on Ryzen AI systems
-2. **NPU Mode**: Power-efficient execution using only NPU (coming soon)
-3. **Generic Mode**: CPU/GPU execution using Ollama backend for broader compatibility
+GAIA uses Lemonade Server as the LLM backend, which provides hardware-optimized model execution on available AMD hardware including NPU and iGPU on supported Ryzen AI systems.
 
 ### Testing Architecture
 

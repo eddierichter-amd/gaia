@@ -45,10 +45,6 @@ setup(
             "rich",
             "bpy",
         ],
-        "notebooks": [
-            "jupyter",
-            "ipywidgets",
-        ],
         "dev": [
             "pytest",
             "pytest-benchmark",

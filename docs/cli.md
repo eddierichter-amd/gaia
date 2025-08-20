@@ -4,8 +4,8 @@ GAIA (Generative AI Acceleration Infrastructure & Applications) provides a comma
 
 ## Platform Support
 
-- **Windows 11**: Full CLI support with installer and desktop shortcuts
-- **Linux (Ubuntu/Debian)**: Full CLI support via source installation
+- **Windows 11**: Full GUI and CLI support with installer and desktop shortcuts
+- **Linux (Ubuntu/Debian)**: Full GUI and CLI support via source installation
 - **macOS**: Not supported
 
 ## GAIA-CLI Getting Started Guide
@@ -13,7 +13,7 @@ GAIA (Generative AI Acceleration Infrastructure & Applications) provides a comma
 ### Windows Installation
 1. Make sure to follow the [Getting Started Guide](../README.md#getting-started-guide) to install the necessary `gaia` CLI and `lemonade` LLM serving tools.
 
-2. GAIA automatically configures optimal settings for Ryzen AI hardware.
+2. GAIA uses Lemonade Server to provide optimal performance on Ryzen AI hardware.
 
 3. Once installed, double click on the desktop icon **GAIA-CLI** to launch the command-line shell with the GAIA environment activated.
 
@@ -22,7 +22,7 @@ GAIA (Generative AI Acceleration Infrastructure & Applications) provides a comma
    - Running: `lemonade-server serve`
 
 ### Linux Installation
-1. **Install from Source**: Follow the [Linux Installation](../README.md#linux-installation-cli-only) instructions in the main README.
+1. **Install from Source**: Follow the [Linux Installation](../README.md#linux-installation) instructions in the main README.
 
 2. **Install Lemonade Server**: Download and install the Lemonade server from [lemonade-server.ai](https://www.lemonade-server.ai) or build from source.
 
@@ -53,7 +53,7 @@ The fastest way to interact with AI models is through the direct LLM command:
 2. Use advanced options:
    ```bash
    # Specify model and token limit
-   gaia llm "Explain quantum computing in simple terms" --model llama3.2:3b --max-tokens 200
+   gaia llm "Explain quantum computing in simple terms" --model Llama-3.2-3B-Instruct-Hybrid --max-tokens 200
 
    # Disable streaming for batch processing
    gaia llm "Write a short poem about AI" --no-stream
@@ -107,14 +107,14 @@ The fastest way to interact with AI models is through the direct LLM command:
    gaia chat "What is machine learning?"
 
    # Use a specific model
-   gaia chat "Explain quantum computing" --model Llama-3.2-1B-Instruct-awq-g128-int4-asym-fp16-onnx-hybrid
+   gaia chat "Explain quantum computing" --model Llama-3.2-1B-Instruct-Hybrid
    ```
 
 ## GAIA CLI Talk Demo
 
 For voice-based interaction with AI models, see the [Voice Interaction Guide](./talk.md).
 
-**Note:** Voice features are currently available on Windows only. Linux support for audio/TTS features is planned for future releases.
+**Note:** Voice features are fully supported on both Windows and Linux platforms.
 
 ## Basic Usage
 
@@ -169,7 +169,7 @@ gaia llm QUERY [OPTIONS]
 gaia llm "What is machine learning?"
 
 # Use specific model with token limit
-gaia llm "Explain neural networks" --model llama3.2:3b --max-tokens 300
+gaia llm "Explain neural networks" --model Llama-3.2-3B-Instruct-Hybrid --max-tokens 300
 
 # Disable streaming for batch processing
 gaia llm "Generate a Python function to sort a list" --no-stream
@@ -186,7 +186,7 @@ gaia prompt "MESSAGE" [OPTIONS]
 ```
 
 **Available options:**
-- `--model`: Model to use for the agent (default: "llama3.2:1b")
+- `--model`: Model to use for the agent (default: "Llama-3.2-3B-Instruct-Hybrid")
 - `--max-new-tokens`: Maximum number of new tokens to generate (default: 512)
 - `--stats`: Show performance statistics after generation
 
@@ -196,10 +196,10 @@ gaia prompt "MESSAGE" [OPTIONS]
 gaia prompt "What is the weather like today?"
 
 # Use a different model with stats
-gaia prompt "Create a poem about AI" --model llama3.2:3b --stats
+gaia prompt "Create a poem about AI" --model Llama-3.2-3B-Instruct-Hybrid --stats
 
 # Use different model and token limit
-gaia prompt "Write a story" --model llama3.2:3b --max-new-tokens 1000
+gaia prompt "Write a story" --model Llama-3.2-3B-Instruct-Hybrid --max-new-tokens 1000
 ```
 
 ## Chat Command
@@ -261,7 +261,7 @@ gaia talk [OPTIONS]
 ```
 
 **Available options:**
-- `--model`: Model to use for the agent (default: "llama3.2:1b")
+- `--model`: Model to use for the agent (default: "Llama-3.2-3B-Instruct-Hybrid")
 - `--max-new-tokens`: Maximum number of new tokens to generate (default: 512)
 - `--no-tts`: Disable text-to-speech in voice chat mode
 - `--audio-device-index`: Index of the audio input device to use (default: 1)
@@ -509,7 +509,7 @@ lemonade-server serve
 - Try different audio device indices if the default doesn't work
 
 **Performance:**
-- For Hybrid mode, disable discrete GPUs in Device Manager
+- For optimal NPU performance, disable discrete GPUs in Device Manager
 - Ensure NPU drivers are up to date
 - Monitor system resources during model execution
 
