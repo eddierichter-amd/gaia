@@ -32,8 +32,9 @@ setup(
         "gaia.mcp",
         "gaia.agents",
         "gaia.agents.base",
-        "gaia.agents.Blender",
-        "gaia.agents.Blender.core",
+        "gaia.agents.blender",
+        "gaia.agents.blender.core",
+        "gaia.agents.jira",
     ],
     package_data={
         "gaia.eval": [
@@ -100,6 +101,8 @@ setup(
         "console_scripts": [
             "gaia = gaia.cli:main",
             "gaia-cli = gaia.cli:main",
+            "gaia-mcp = gaia.mcp.mcp_bridge:main",
+            "gaia-mcp-atlassian = gaia.mcp.atlassian_mcp:main",
         ]
     },
     python_requires=">=3.8, <3.13",
