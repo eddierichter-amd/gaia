@@ -4,6 +4,8 @@
 
 The GAIA Jira Agent provides a natural language interface for interacting with Atlassian Jira. The agent communicates directly with the Atlassian REST API - no intermediary services or MCP bridge required. It automatically discovers your Jira instance configuration and allows you to search, create, and update issues using plain English commands.
 
+> **Desktop WebUI**: GAIA includes a JIRA WebUI as an Electron desktop application. See the [WebUI Configuration](#webui-configuration) section below for setup instructions.
+
 ## Quick Start
 
 ### Prerequisites
@@ -583,8 +585,18 @@ python tests/test_jira.py --show-prompts # Display LLM prompts
 - **Attachment Support**: Does not currently support file attachments
 - **Workflow Transitions**: Limited support for complex workflow transitions
 
+## WebUI Configuration
+
+The JIRA WebUI provides an in-app configuration screen where you can:
+- Enter your JIRA server URL
+- Set your username/email
+- Configure your API token
+
+Configuration is stored locally and persists between sessions.
+
 ## See Also
 
+- [Apps Documentation](./apps.md) - Desktop applications documentation
 - [GAIA CLI Documentation](./cli.md) - Full command line interface guide
 - [MCP Server Documentation](./mcp.md) - External integration details
 - [Agent Development Guide](./dev.md) - Build your own agents

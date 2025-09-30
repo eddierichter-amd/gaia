@@ -349,7 +349,6 @@ async def main(cli_args=None):
 
     # Create app
     app = JiraApp(verbose=args.verbose, debug=args.debug, model=args.model)
-
     try:
         # Initialize
         if not await app.connect():
@@ -396,7 +395,6 @@ Examples:
             # Single command mode
             result = await app.execute_command(args.command)
             app._display_result(result)  # pylint: disable=protected-access
-
         else:
             parser.print_help()
 

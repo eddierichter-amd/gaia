@@ -1,3 +1,6 @@
+// Copyright(C) 2024-2025 Advanced Micro Devices, Inc. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 class EvaluationVisualizer {
     constructor() {
         console.log('EvaluationVisualizer constructor called');

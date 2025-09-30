@@ -350,15 +350,17 @@ The tests validate:
 4. **Access Control**: Restrict access to specific IP addresses or networks
 5. **Audit Logging**: Enable logging for compliance and debugging
 
-
-
-
 ## Architecture Notes
 
 - **HTTP-Native**: Pure REST/JSON-RPC, no WebSocket dependencies
 - **Stateless**: Each request is independent for better scalability
 - **Agent Access**: Direct access to all GAIA agents
 - **CORS Enabled**: Works with browser-based applications
+
+## Applications
+
+GAIA provides applications that connect to the MCP server. For using existing apps or building new ones, see the [Apps Documentation](./apps.md).
+
 
 ## See Also
 

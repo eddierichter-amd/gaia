@@ -6,11 +6,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 GAIA (Generative AI Is Awesome) is AMD's open-source framework for running generative AI applications locally on AMD hardware, with specialized optimizations for Ryzen AI processors with NPU support.
 
+## File Headers
+
+**IMPORTANT: All new files created in this project MUST start with the following copyright header (using appropriate comment syntax for the file type):**
+
+```
+Copyright(C) 2024-2025 Advanced Micro Devices, Inc. All rights reserved.
+SPDX-License-Identifier: MIT
+```
+
 ## Documentation
 
 Comprehensive documentation is available in the `docs/` directory:
 
 ### User Guides
+- [`docs/apps.md`](docs/apps.md) - Desktop applications overview
+  - [`docs/apps/jira.md`](docs/apps/jira.md) - Jira app documentation
 - [`docs/cli.md`](docs/cli.md) - Command Line Interface guide and usage examples
 - [`docs/features.md`](docs/features.md) - Complete feature overview and platform support matrix
 - [`docs/chat.md`](docs/chat.md) - Interactive chat agent documentation
@@ -18,11 +29,13 @@ Comprehensive documentation is available in the `docs/` directory:
 - [`docs/blender.md`](docs/blender.md) - Blender 3D agent for content creation
 - [`docs/jira.md`](docs/jira.md) - Jira agent for issue management with natural language interface
 - [`docs/ui.md`](docs/ui.md) - Web UI documentation and deployment guide
+- [`docs/n8n.md`](docs/n8n.md) - n8n workflow integration
 
 ### Developer Resources
 - [`docs/dev.md`](docs/dev.md) - Development environment setup and contribution guidelines
+- [`docs/apps/dev.md`](docs/apps/dev.md) - App development guide (building GAIA desktop applications)
 - [`docs/eval.md`](docs/eval.md) - Evaluation framework for model testing and benchmarking
-- [`docs/mcp-bridge.md`](docs/mcp-bridge.md) - MCP (Model Context Protocol) bridge for external integrations
+- [`docs/mcp.md`](docs/mcp.md) - MCP server documentation and API reference
 
 ### Installation & Setup
 - [`docs/installer.md`](docs/installer.md) - NSIS installer documentation and customization
@@ -196,9 +209,14 @@ gaia/
 │   │       ├── agent.py        # Jira agent with NLP capabilities
 │   │       └── app.py          # Jira agent entry point
 │   ├── apps/           # Standalone applications
+│   │   ├── _shared/    # Shared utilities for app development
+│   │   │   └── dev-server.js   # Development server for browser mode
+│   │   ├── example/    # Example MCP integration app (demo/template)
+│   │   │   └── webui/          # Electron app structure
+│   │   ├── jira/       # Jira app with natural language interface
+│   │   │   └── webui/          # Electron app structure
 │   │   ├── llm/        # Direct LLM interface
 │   │   │   └── app.py          # LLM query application
-│   │   ├── jira/       # Jira app components
 │   │   └── summarize/  # Document summarization
 │   │       └── app.py          # Summarization application
 │   ├── audio/          # Audio processing (ASR/TTS)
@@ -243,8 +261,13 @@ gaia/
 │   ├── test_summarizer.py      # Summarizer tests
 │   └── conftest.py             # Pytest configuration
 ├── docs/               # Documentation
+│   ├── apps/           # App-specific documentation
+│   │   ├── dev.md              # App development guide
+│   │   └── jira.md             # Jira app documentation
+│   ├── apps.md                 # Desktop applications overview
 │   ├── cli.md                  # CLI reference guide
 │   ├── mcp.md                  # MCP server documentation
+│   ├── n8n.md                  # n8n workflow integration
 │   ├── jira.md                 # Jira agent guide
 │   ├── blender.md              # Blender agent guide
 │   ├── chat.md                 # Chat interface guide
@@ -252,6 +275,7 @@ gaia/
 │   ├── eval.md                 # Evaluation framework guide
 │   ├── dev.md                  # Development guide
 │   ├── features.md             # Feature overview
+│   ├── ui.md                   # Web UI documentation
 │   └── faq.md                  # Troubleshooting guide
 ├── installer/          # NSIS installer scripts
 │   └── installer.nsi           # Windows installer script
@@ -311,6 +335,9 @@ gaia/
    - Background process management with status tracking
 
 6. **Applications** (`src/gaia/apps/`): Standalone application modules
+   - Shared development utilities (`_shared/`) for browser and Electron modes
+   - Example app template for MCP integration demos
+   - Jira app with natural language interface for issue management
    - Document summarization with multiple output styles and formats
    - PDF formatting and HTML viewing capabilities
    - Configurable summarization templates and prompts
@@ -372,7 +399,7 @@ GitHub Actions workflows are configured for:
 - **Document Summarization**: Multiple styles and output formats for document processing. See [`docs/features.md`](docs/features.md) for usage examples
 - **Model Evaluation**: See [`docs/eval.md`](docs/eval.md) for testing and benchmarking
 - **Web UI**: See [`docs/ui.md`](docs/ui.md) for browser-based interface
-- **MCP Integration**: See [`docs/mcp-bridge.md`](docs/mcp-bridge.md) and [`docs/cli.md`](docs/cli.md#mcp-command) for external client integration
+- **MCP Integration**: See [`docs/mcp.md`](docs/mcp.md) and [`docs/cli.md`](docs/cli.md#mcp-command) for external client integration
 
 ### Platform-Specific Guides
 - **Windows Installation**: See [`docs/cli.md`](docs/cli.md#windows-installation) and [`docs/installer.md`](docs/installer.md)
@@ -381,6 +408,7 @@ GitHub Actions workflows are configured for:
 
 ### Development Resources
 - **Contributing Guidelines**: See [`docs/dev.md`](docs/dev.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- **Building Desktop Apps**: See [`docs/apps/dev.md`](docs/apps/dev.md) for creating GAIA Electron applications
 - **Troubleshooting**: See [`docs/faq.md`](docs/faq.md)
 - **Evaluation Framework**: See [`docs/eval.md`](docs/eval.md) for creating tests and benchmarks
 - **Test Documentation**: See [`tests/TEST_JIRA_GUIDE.md`](tests/TEST_JIRA_GUIDE.md) for Jira testing guide
