@@ -3,9 +3,10 @@
 Simple microphone test - just records and shows audio levels
 """
 
-import pyaudio
-import numpy as np
 import time
+
+import numpy as np
+import pyaudio
 
 
 def test_mic():

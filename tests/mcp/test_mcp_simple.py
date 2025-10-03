@@ -4,11 +4,11 @@ Simple test to validate the MCP HTTP bridge is working.
 Run this after starting the bridge with: gaia mcp start
 """
 
-import json
-import urllib.request
-import urllib.error
-import sys
 import io
+import json
+import sys
+import urllib.error
+import urllib.request
 
 # Fix Unicode on Windows
 if sys.platform == "win32":

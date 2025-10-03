@@ -1,10 +1,10 @@
 # Copyright(C) 2024-2025 Advanced Micro Devices, Inc. All rights reserved.
 # SPDX-License-Identifier: MIT
 
-from importlib.metadata import version as get_package_version_metadata
 import logging
-import subprocess
 import os
+import subprocess
+from importlib.metadata import version as get_package_version_metadata
 
 __version__ = "0.10.1"
 

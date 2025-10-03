@@ -1,9 +1,10 @@
 # This Blender MCP client is a simplified and modified version of the BlenderMCP project from https://github.com/BlenderMCP/blender-mcp
 
-import socket
 import json
 import logging
 import re
+import socket
+
 from gaia.logger import get_logger
 
 

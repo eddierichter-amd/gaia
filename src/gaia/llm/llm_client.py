@@ -1,13 +1,14 @@
 # Standard library imports
 import logging
 import os
-from typing import Optional, Dict, Any, Literal, Union, Iterator
+from typing import Any, Dict, Iterator, Literal, Optional, Union
+
+import httpx
 
 # Third-party imports
 import requests
 from dotenv import load_dotenv
 from openai import OpenAI
-import httpx
 
 # Local imports
 from .lemonade_client import DEFAULT_MODEL_NAME

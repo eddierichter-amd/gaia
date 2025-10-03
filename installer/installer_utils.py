@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-import sys
 import re
 import subprocess
-from packaging import version
-import os
+import sys
 from datetime import datetime
+
+from packaging import version
 
 
 def log_message(message):
@@ -15,7 +15,7 @@ def log_message(message):
         with open(log_file, "a", encoding="utf-8") as f:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             f.write(f"[{timestamp}] {message}\n")
-    except Exception as e:
+    except Exception:
         # If we can't write to log, we have a bigger problem
         # but don't want to crash the installer
         pass
@@ -95,7 +95,7 @@ def get_lemonade_version():
         # Combine stdout and stderr to get complete output
         full_output = result.stdout + result.stderr
 
-        log_message(f"Lemonade version command output:")
+        log_message("Lemonade version command output:")
         log_message(f"Return code: {result.returncode}")
         log_message(f"Full output: {repr(full_output)}")
 

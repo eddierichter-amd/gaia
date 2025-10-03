@@ -77,6 +77,7 @@ setup(
             "pylint",
             "isort",
             "flake8",
+            "autoflake",
             "mypy",
             "bandit",
             "responses",

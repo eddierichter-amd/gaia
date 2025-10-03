@@ -1,4 +1,5 @@
-from typing import Dict, Optional
+from typing import Dict
+
 from gaia.mcp.blender_mcp_client import MCPClient
 
 

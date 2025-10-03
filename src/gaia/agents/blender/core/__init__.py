@@ -1,7 +1,7 @@
-from .scene import SceneManager
 from .materials import MaterialManager
-from .rendering import RenderManager
 from .objects import ObjectManager
+from .rendering import RenderManager
+from .scene import SceneManager
 from .view import ViewManager
 
 __all__ = [

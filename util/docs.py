@@ -1,5 +1,4 @@
 import os
-import re
 from pathlib import Path
 
 def update_github_links(folder_path):

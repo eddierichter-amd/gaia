@@ -1,10 +1,10 @@
-import json
 import argparse
-import random
-from datetime import datetime, timedelta
+import json
+from datetime import datetime
 from pathlib import Path
-from gaia.logger import get_logger
+
 from gaia.eval.claude import ClaudeClient
+from gaia.logger import get_logger
 
 
 class EmailGenerator:
@@ -453,6 +453,7 @@ Examples:
 
     try:
         # Filter email types if specified
+        original_templates = None
         if args.email_types:
             # Temporarily filter the templates
             original_templates = generator.email_templates.copy()
@@ -488,7 +489,7 @@ Examples:
         print(f"  Claude model: {generation_info['claude_model']}")
 
         # Restore original templates if they were filtered
-        if args.email_types:
+        if args.email_types and original_templates is not None:
             generator.email_templates = original_templates
 
     except Exception as e:

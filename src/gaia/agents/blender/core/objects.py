@@ -1,5 +1,6 @@
 import math
 from typing import Dict, Tuple
+
 from gaia.mcp.blender_mcp_client import MCPClient
 
 

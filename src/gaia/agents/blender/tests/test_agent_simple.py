@@ -1,9 +1,11 @@
-import pytest
 import json
 import logging
+
+import pytest
+
 from gaia.agents.blender.agent_simple import BlenderAgentSimple
-from gaia.llm.llm_client import LLMClient
 from gaia.agents.blender.mcp.mcp_client import MCPClient
+from gaia.llm.llm_client import LLMClient
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)

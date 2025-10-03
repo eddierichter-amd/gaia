@@ -1,13 +1,15 @@
-from pathlib import Path
 import json
-import numpy as np
 import time
-from typing import Dict, List, Optional
-from gaia.logger import get_logger
-from gaia.eval.claude import ClaudeClient
 from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
+from gaia.eval.claude import ClaudeClient
+from gaia.logger import get_logger
 
 
 class RagEvaluator:

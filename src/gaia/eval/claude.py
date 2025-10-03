@@ -1,11 +1,13 @@
-import os
-import anthropic
 import base64
-from dotenv import load_dotenv
-from bs4 import BeautifulSoup
-from gaia.logger import get_logger
 import json
+import os
 from pathlib import Path
+
+import anthropic
+from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+
+from gaia.logger import get_logger
 
 load_dotenv()
 

@@ -3,11 +3,11 @@
 Basic talk mode test - minimal complexity for debugging
 """
 
+import time
+
 import numpy as np
 import pyaudio
 import whisper
-import time
-import sys
 
 
 def test_basic_talk():

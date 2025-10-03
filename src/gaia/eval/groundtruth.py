@@ -1,9 +1,10 @@
+import argparse
 import json
 import time
-import argparse
 from datetime import datetime
-from pathlib import Path
 from enum import Enum
+from pathlib import Path
+
 from gaia.eval.claude import ClaudeClient
 from gaia.logger import get_logger
 

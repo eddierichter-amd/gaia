@@ -1,6 +1,7 @@
+from typing import Any, Dict, Optional, Tuple
+
 from gaia.llm.llm_client import LLMClient
 from gaia.mcp.blender_mcp_client import MCPClient
-from typing import Dict, Any, Optional, Tuple
 
 
 class BlenderAgentSimple:

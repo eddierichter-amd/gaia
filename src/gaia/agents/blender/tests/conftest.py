@@ -1,8 +1,7 @@
-import pytest
-import socket
-import time
 import logging
-from contextlib import contextmanager
+import socket
+
+import pytest
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

@@ -5,10 +5,10 @@ Simple LLM App using the existing LLMClient wrapper to call Lemonade localhost b
 
 import argparse
 import sys
-from typing import Optional, Union, Iterator
+from typing import Iterator, Optional, Union
 
-from gaia.logger import get_logger
 from gaia.llm.llm_client import LLMClient
+from gaia.logger import get_logger
 
 
 class LlmApp:
@@ -100,6 +100,7 @@ def cli_main():
 
     # Setup logging
     import logging
+
     from gaia.logger import log_manager
 
     log_manager.set_level("gaia", getattr(logging, args.logging_level))
