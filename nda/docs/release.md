@@ -2,34 +2,33 @@
 
 This document describes the process for releasing updates to the open-source gaia repository [amd/gaia](https://github.com/amd/gaia)
 
-1. There are three repositories we will be dealing with here:
-    1. [gaia-pirate](https://github.com/aigdata/gaia): the private repository most development is happening.
-    1. [gaia-internal](https://gitenterprise.xilinx.com/AIG-DAT/gaia_internal): the internal staging repository for legal scan.
-    1. [gaia-public](https://github.com/amd/gaia): the public open-source repository.
+1. There are two repositories we will be dealing with here:
+    1. [gaia-pirate](https://github.com/aigdat/gaia): the private repository where all development happens (single source of truth).
+    2. [gaia-public](https://github.com/amd/gaia): the public open-source repository.
 
 ## Introduction
 
-`release.py` is a script designed to sync approved code from a private AMD repository (aigdat/gaia) to an open-source repository. Here's its main workflow:
+`release.py` is a script designed to sync approved code from the private gaia-pirate repository (aigdat/gaia) to the public open-source repository (github.com/amd/gaia). Here's its main workflow:
 
-1. **Input**: Takes a destination path (`-o` argument) where the OSS repo is cloned, and an optional `--internal` flag for AMD-internal syncs.
+1. **Input**: Takes a destination path (`-o` argument) where the public gaia repo is cloned.
 
 2. **File Filtering**:
    - Uses Git to get a list of tracked files in the source repository
    - Filters out files based on an exclude list (like NDA content, internal workflows, etc.)
-   - The `--internal` flag can bypass these filters for AMD-internal use
+   - Files in the `./nda` directory are automatically excluded
 
 3. **File Operations**:
    - Creates necessary directory structure in the target repository
    - Copies filtered files from source to destination
-   - Updates GitHub links in markdown files
+   - Updates GitHub links in markdown files to point to the public repository
    - Prints detailed information about which files were copied and which were excluded
 
 4. **Safety Features**:
    - Enforces the private repo as the single source of truth
    - Prevents accidental copying of internal/NDA content through the exclude list
-   - Requires manual review of changes before committing to the OSS repo
+   - Requires manual review and legal approval of changes before committing to the public repo
 
-The script is designed to be part of a controlled release process where changes must be reviewed before being pushed to the public repository.
+The script is designed to be part of a controlled release process where changes must be reviewed and legally approved before being pushed to the public repository.
 
 ## Release Process
 
@@ -52,23 +51,8 @@ The script is designed to be part of a controlled release process where changes 
     git push --tags
     ```
 
-### Step 2: Push your changes to GAIA-Internal
+### Step 2: Push your changes to GAIA-Public
 
-1. Clone the [gaia_internal](https://gitenterprise.xilinx.com/AIG-DAT/gaia_internal) repo in a separate folder and create a branch.
-    ```bash
-    git clone https://gitenterprise.xilinx.com/AIG-DAT/gaia_internal
-    cd gaia_internal
-    git branch v0.7.4
-    git checkout v0.7.4
-    ```
-1. Run `python release.py -o <path-to-gaia-public>`
-    1. For example: `python release.py -o ..\gaia_internal`
-1. Create a Pull Request and initiate the code scan process. See [AMD Open Source Resources](https://amdcloud.sharepoint.com/sites/amd-legal/SitePages/OSRB.aspx) for more info.
-1. Once the code has been approved for release, complete the PR into the main branch and continue to the next section.
-
-### Step 3: Push your changes to GAIA-Public
-
-1. Now that the changes have been scanned by legal, we can push them to the pubic repo.
 1. Clone the [gaia-public](https://github.com/amd/gaia) repo in a separate folder and create a branch.
     ```bash
     git clone https://github.com/amd/gaia
@@ -76,10 +60,11 @@ The script is designed to be part of a controlled release process where changes 
     git branch v0.7.4
     git checkout v0.7.4
     ```
-1. Go to your gaia-internal clone and make sure you are on the commit that is targeting the release.
+1. Go to your gaia-pirate clone and make sure you are on the commit that is targeting the release.
 1. Run `python release.py -o <path-to-gaia-public>`
     1. For example: `python release.py -o ..\gaia_public\gaia`
-1. Once all tests pass, complete the PR into the main branch.
+1. Create a Pull Request and initiate the legal review process. See [AMD Open Source Resources](https://amdcloud.sharepoint.com/sites/amd-legal/SitePages/OSRB.aspx) for more info.
+1. Once legal approval is obtained and all tests pass, complete the PR into the main branch.
 1. Create a tag in the `main` branch that matches the version above and push it to origin.
     ```bash
     git checkout main
