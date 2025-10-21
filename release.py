@@ -4,17 +4,17 @@
 # SPDX-License-Identifier: MIT
 
 # Requirement: `pip install black`
-# 
+#
 # This script releases the approved sections of aigdat/gaia to the open source repo.
-# 
+#
 # At the time of this writing, we are releasing the core functionality while keeping some
 # internal tools and configurations private.
-# 
+#
 # NOTE: This repo is the single source of truth (SSOT) for gaia.
 # Please do not check code directly into the OSS repo!!! Only check code into this
 # private repo, then use this script to sync it to the OSS repo. We don't have any tooling
 # for syncing code in the other direction (public -> private).
-# 
+#
 # Usage:
 # 1. Make sure you already cloned the Gaia OSS repo on to your hard drive.
 #    We'll use C:\work\gaia as an example clone.
@@ -27,7 +27,7 @@
 #    no internal/NDA files slipped through the filters.
 # 6. Use `git commit -am MESSAGE` and `git push` to sync your updates to the server.
 # 7. Launch a PR for your branch on the OSS repo.
-# 
+#
 # Details of operation:
 # - All source files under src/gaia are copied, except those that violate the
 #   `exclude` list filter.
@@ -39,11 +39,11 @@
 # - The script copies all files and then updates all markdown files with correct github links
 # - The script prints out which files will be copied, which are excluded, and their destination paths
 
-import os
 import argparse
+import os
+import shutil
 import subprocess
 from pathlib import Path
-import shutil
 from typing import List
 
 from util.docs import update_github_links
@@ -123,16 +123,16 @@ def main():
     for path in file_paths:
         # Get the relative path from gaia_location
         rel_path = os.path.relpath(path, gaia_location)
-        
+
         # Check if the path should be excluded
         filter_out = any(
             rel_path == ex or rel_path.startswith(f"{ex}{os.path.sep}")
             for ex in exclude
         )
-        
+
         if not filter_out:
             filtered_file_paths.append(path)
-            
+
     print("The following source files will be copied:\n")
     for path in filtered_file_paths:
         print(path)
