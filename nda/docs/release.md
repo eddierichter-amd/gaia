@@ -63,8 +63,8 @@ The script is designed to be part of a controlled release process where changes 
 1. Go to your gaia-pirate clone and make sure you are on the commit that is targeting the release.
 1. Run `python release.py -o <path-to-gaia-public>`
     1. For example: `python release.py -o ..\gaia_public\gaia`
-1. Create a Pull Request and initiate the legal review process. See [AMD Open Source Resources](https://amdcloud.sharepoint.com/sites/amd-legal/SitePages/OSRB.aspx) for more info.
-1. Once legal approval is obtained and all tests pass, complete the PR into the main branch.
+1. Create a Pull Request and wait for approval from one of the admins.
+1. Once approval is obtained and all tests pass, complete the PR into the main branch.
 1. Create a tag in the `main` branch that matches the version above and push it to origin.
     ```bash
     git checkout main
