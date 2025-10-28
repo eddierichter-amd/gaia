@@ -80,7 +80,7 @@ def prompt_delete_file(file_path):
     """
     while True:
         response = input(f"\nDelete {file_path}? (y/n): ").strip().lower()
-        if response in ['y', 'yes']:
+        if response in ["y", "yes"]:
             try:
                 os.remove(file_path)
                 print(f"  Deleted: {file_path}")
@@ -88,7 +88,7 @@ def prompt_delete_file(file_path):
             except Exception as e:
                 print(f"  Error deleting file: {e}")
                 return False
-        elif response in ['n', 'no']:
+        elif response in ["n", "no"]:
             print(f"  Skipped: {file_path}")
             return False
         else:
@@ -110,7 +110,7 @@ def copy_and_update(path, new_path):
     # Copy the file
     shutil.copy2(path, new_path)
 
-    return 'modified' if file_exists else 'added'
+    return "modified" if file_exists else "added"
 
 
 def main():
@@ -184,12 +184,12 @@ def main():
         # Get the relative path from gaia_location and normalize separators
         rel_path = os.path.relpath(path, gaia_location)
         # Normalize to forward slashes for consistent comparison (git uses forward slashes)
-        rel_path_normalized = rel_path.replace(os.path.sep, '/')
+        rel_path_normalized = rel_path.replace(os.path.sep, "/")
 
         # Check if the path should be excluded
         filter_out = any(
-            rel_path_normalized == ex.replace(os.path.sep, '/') or
-            rel_path_normalized.startswith(f"{ex.replace(os.path.sep, '/')}/")
+            rel_path_normalized == ex.replace(os.path.sep, "/")
+            or rel_path_normalized.startswith(f"{ex.replace(os.path.sep, '/')}/")
             for ex in exclude
         )
 
@@ -212,7 +212,9 @@ def main():
             dest_git_output = subprocess.check_output(
                 ["git", "ls-files"], cwd=destination_location, stderr=subprocess.DEVNULL
             )
-            destination_tracked_files = set(dest_git_output.decode("utf-8").splitlines())
+            destination_tracked_files = set(
+                dest_git_output.decode("utf-8").splitlines()
+            )
         except subprocess.CalledProcessError:
             # Destination is not a git repo or git command failed
             pass
@@ -232,10 +234,10 @@ def main():
         operation = copy_and_update(path, str(new_path))
 
         # Track the relative path for deletion detection (normalized to forward slashes)
-        rel_path_normalized = rel_path.replace(os.path.sep, '/')
+        rel_path_normalized = rel_path.replace(os.path.sep, "/")
         source_relative_files.add(rel_path_normalized)
 
-        if operation == 'added':
+        if operation == "added":
             added_files.append(str(new_path))
         else:
             modified_files.append(str(new_path))
@@ -244,13 +246,13 @@ def main():
     deleted_files = []
     for dest_file in destination_tracked_files:
         # Normalize destination file path to forward slashes (git always uses forward slashes)
-        dest_file_normalized = dest_file.replace('\\', '/')
+        dest_file_normalized = dest_file.replace("\\", "/")
 
         # Check if this file should be in our filtered list
         # Only consider it deleted if it's not in the exclude list
         should_be_excluded = any(
-            dest_file_normalized == ex.replace(os.path.sep, '/') or
-            dest_file_normalized.startswith(f"{ex.replace(os.path.sep, '/')}/")
+            dest_file_normalized == ex.replace(os.path.sep, "/")
+            or dest_file_normalized.startswith(f"{ex.replace(os.path.sep, '/')}/")
             for ex in exclude
         )
 
@@ -271,7 +273,9 @@ def main():
         print("\n" + "=" * 70)
         print("OBSOLETE FILES DETECTED")
         print("=" * 70)
-        print(f"\nFound {len(deleted_files)} file(s) in destination that no longer exist in source:")
+        print(
+            f"\nFound {len(deleted_files)} file(s) in destination that no longer exist in source:"
+        )
         for deleted_file in deleted_files:
             print(f"  - {deleted_file}")
 
@@ -294,7 +298,9 @@ def main():
         empty_dirs_removed = remove_empty_directories(str(destination_location))
 
         if empty_dirs_removed > 0:
-            print(f"\nRemoved {empty_dirs_removed} empty director{'y' if empty_dirs_removed == 1 else 'ies'}")
+            print(
+                f"\nRemoved {empty_dirs_removed} empty director{'y' if empty_dirs_removed == 1 else 'ies'}"
+            )
         else:
             print("No empty directories found.")
 
