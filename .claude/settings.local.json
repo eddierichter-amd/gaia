@@ -1,6 +1,7 @@
 {
   "permissions": {
     "allow": [
+      "Bash(dir:*)",
       "Bash(gh issue list:*)",
       "Bash(gh issue view:*)",
       "Bash(gh pr list:*)",
