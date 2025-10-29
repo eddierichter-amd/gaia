@@ -23,6 +23,14 @@ except ImportError:
     BlenderAgent = None
     MCPClient = None
     BLENDER_AVAILABLE = False
+
+try:
+    from gaia.agents.code.agent import CodeAgent
+
+    CODE_AVAILABLE = True
+except ImportError:
+    CodeAgent = None
+    CODE_AVAILABLE = False
 from gaia.llm.lemonade_client import (
     DEFAULT_MODEL_NAME,
     LemonadeClient,
@@ -73,16 +81,32 @@ def check_lemonade_health(host="127.0.0.1", port=8000):
         return False
 
 
-def print_lemonade_error():
-    """Print informative error message when Lemonade is not running."""
+def print_lemonade_error(for_code_agent=False):
+    """Print informative error message when Lemonade is not running.
+
+    Args:
+        for_code_agent: If True, includes instructions for --ctx-size parameter
+    """
     print(
         "❌ Error: Lemonade server is not running or not accessible.", file=sys.stderr
     )
     print("", file=sys.stderr)
     print("Please start the Lemonade server first by:", file=sys.stderr)
     print("  • Double-clicking the desktop shortcut, or", file=sys.stderr)
-    print("  • Running: lemonade-server serve", file=sys.stderr)
+    if for_code_agent:
+        print(
+            "  • Running: lemonade-server serve --ctx-size 32768  (for Code Agent)",
+            file=sys.stderr,
+        )
+    else:
+        print("  • Running: lemonade-server serve", file=sys.stderr)
     print("", file=sys.stderr)
+    if for_code_agent:
+        print(
+            "Note: Code Agent requires larger context size (32768 tokens)",
+            file=sys.stderr,
+        )
+        print("", file=sys.stderr)
     print(
         "The server should be accessible at http://127.0.0.1:8000/api/v1/health",
         file=sys.stderr,
@@ -707,6 +731,77 @@ def main():
         action="store_true",
         help="Enable debug logging",
     )
+
+    # Add Code agent command
+    code_parser = subparsers.add_parser(
+        "code",
+        help="Python code assistant with analysis, generation, and linting",
+        parents=[parent_parser],
+    )
+    code_parser.add_argument(
+        "query",
+        nargs="?",
+        help="Code operation query (e.g., 'Generate a function to sort a list')",
+    )
+    code_parser.add_argument(
+        "--interactive",
+        "-i",
+        action="store_true",
+        help="Interactive mode for multiple queries",
+    )
+    code_parser.add_argument(
+        "--silent",
+        "-s",
+        action="store_true",
+        help="Silent mode - suppress console output, return JSON only",
+    )
+    code_parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug logging",
+    )
+    code_parser.add_argument(
+        "--show-prompts",
+        action="store_true",
+        help="Display prompts sent to LLM",
+    )
+    code_parser.add_argument(
+        "--output",
+        "-o",
+        help="Output file for results (JSON format)",
+    )
+    code_parser.add_argument(
+        "--max-steps",
+        type=int,
+        default=100,
+        help="Maximum conversation steps (default: 100)",
+    )
+    code_parser.add_argument(
+        "--list-tools",
+        action="store_true",
+        help="List all available tools and exit",
+    )
+    code_parser.add_argument(
+        "--use-claude",
+        action="store_true",
+        help="Use Claude API instead of local Lemonade server",
+    )
+    code_parser.add_argument(
+        "--use-chatgpt",
+        action="store_true",
+        help="Use ChatGPT/OpenAI API instead of local Lemonade server",
+    )
+    code_parser.add_argument(
+        "--streaming",
+        action="store_true",
+        help="Enable real-time streaming of LLM responses (shows raw JSON)",
+    )
+    code_parser.add_argument(
+        "--step-through",
+        action="store_true",
+        help="Enable step-through debugging mode (pause at each agent step)",
+    )
+    code_parser.set_defaults(action="code")
 
     # Add Docker app command
     docker_parser = subparsers.add_parser(
@@ -3054,6 +3149,11 @@ Let me know your answer!
         handle_blender_command(args)
         return
 
+    # Handle Code command
+    if args.action == "code":
+        handle_code_command(args)
+        return
+
     # Handle Jira command
     if args.action == "jira":
         handle_jira_command(args)
@@ -3276,6 +3376,179 @@ def run_blender_interactive_mode(agent, print_result=True):
             break
         except Exception as e:
             console.print_error(f"Error processing Blender query: {e}")
+
+
+def handle_code_command(args):
+    """
+    Handle the Code agent command.
+
+    Args:
+        args: Parsed command line arguments for the code command
+    """
+    log = get_logger(__name__)
+
+    if not CODE_AVAILABLE:
+        log.error("Code agent is not available. Please check your installation.")
+        return
+
+    # Check if using local Lemonade server (not Claude or ChatGPT)
+    using_local = not getattr(args, "use_claude", False) and not getattr(
+        args, "use_chatgpt", False
+    )
+
+    # Check Lemonade health if using local server
+    if using_local and not check_lemonade_health():
+        print_lemonade_error(for_code_agent=True)
+        sys.exit(1)
+
+    try:
+        # Initialize the Code agent
+        agent = CodeAgent(
+            silent_mode=getattr(args, "silent", False),
+            debug=getattr(args, "debug", False),
+            show_prompts=getattr(args, "show_prompts", False),
+            max_steps=getattr(args, "max_steps", 100),
+            use_claude=getattr(args, "use_claude", False),
+            use_chatgpt=getattr(args, "use_chatgpt", False),
+            streaming=getattr(args, "streaming", False),
+            step_through=getattr(args, "step_through", False),
+        )
+
+        # Handle list tools option
+        if getattr(args, "list_tools", False):
+            agent.list_tools(verbose=True)
+            return
+
+        # Handle interactive mode
+        if getattr(args, "interactive", False):
+            log.info("🤖 Code Agent Interactive Mode")
+            log.info("Type 'exit' or 'quit' to end the session")
+            log.info("Type 'help' for available commands\n")
+
+            while True:
+                try:
+                    query = input("\ncode> ").strip()
+
+                    if query.lower() in ["exit", "quit"]:
+                        log.info("Goodbye!")
+                        break
+
+                    if query.lower() == "help":
+                        print("\nAvailable commands:")
+                        print("  Generate functions, classes, or tests")
+                        print("  Analyze Python files")
+                        print("  Validate Python syntax")
+                        print("  Lint and format code")
+                        print("  Edit files with diffs")
+                        print("  Search for code patterns")
+                        print("  Type 'exit' or 'quit' to end")
+                        continue
+
+                    if not query:
+                        continue
+
+                    # Process the query
+                    result = agent.process_query(
+                        query,
+                        max_steps=getattr(args, "max_steps", 100),
+                        output_to_file=bool(getattr(args, "output", None)),
+                        filename=getattr(args, "output", None),
+                    )
+
+                    # Display result
+                    if not args.silent:
+                        if result.get("status") == "success":
+                            log.info(f"\n✅ {result.get('result', 'Task completed')}")
+                        else:
+                            log.error(f"\n❌ {result.get('result', 'Task failed')}")
+
+                except KeyboardInterrupt:
+                    print("\n\nInterrupted. Type 'exit' to quit.")
+                    continue
+                except Exception as e:
+                    log.error(f"Error processing query: {e}")
+                    if args.debug:
+                        import traceback
+
+                        traceback.print_exc()
+
+        # Single query mode
+        elif hasattr(args, "query") and args.query:
+            result = agent.process_query(
+                args.query,
+                max_steps=args.max_steps,
+                output_to_file=bool(getattr(args, "output", None)),
+                filename=getattr(args, "output", None),
+            )
+
+            # Output result
+            if args.silent:
+                # In silent mode, output only JSON
+                import json
+
+                print(json.dumps(result, indent=2))
+            else:
+                # Display formatted result
+                agent.display_result("Code Operation Result", result)
+
+        else:
+            # Default to interactive mode when no query provided
+            log.info("Starting Code Agent interactive mode (type 'help' for commands)")
+
+            while True:
+                try:
+                    query = input("\ncode> ").strip()
+
+                    if query.lower() in ["exit", "quit"]:
+                        log.info("Goodbye!")
+                        break
+
+                    if query.lower() == "help":
+                        print("\nAvailable commands:")
+                        print("  Generate functions, classes, or tests")
+                        print("  Analyze Python files")
+                        print("  Validate Python syntax")
+                        print("  Lint and format code")
+                        print("  Edit files with diffs")
+                        print("  Search for code patterns")
+                        print("  Type 'exit' or 'quit' to end")
+                        continue
+
+                    if not query:
+                        continue
+
+                    # Process the query
+                    result = agent.process_query(
+                        query,
+                        max_steps=getattr(args, "max_steps", 100),
+                        output_to_file=bool(getattr(args, "output", None)),
+                        filename=getattr(args, "output", None),
+                    )
+
+                    # Display result
+                    if not args.silent:
+                        if result.get("status") == "success":
+                            log.info(f"\n✅ {result.get('result', 'Task completed')}")
+                        else:
+                            log.error(f"\n❌ {result.get('result', 'Task failed')}")
+
+                except KeyboardInterrupt:
+                    print("\n\nInterrupted. Type 'exit' to quit.")
+                    continue
+                except Exception as e:
+                    log.error(f"Error processing query: {e}")
+                    if getattr(args, "debug", False):
+                        import traceback
+
+                        traceback.print_exc()
+            return
+
+    except Exception as e:
+        log.error(f"Error initializing Code agent: {e}")
+        if getattr(args, "debug", False):
+            import traceback
+
+            traceback.print_exc()
 
 
 def handle_jira_command(args):

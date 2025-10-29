@@ -137,6 +137,164 @@
             "stopOnEntry": false,
         },
         {
+            "name": "Code Agent Debug - Snake Game",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "gaia.cli",
+            "args": [
+                "code",
+                "create a snake game",
+                "--debug",
+                "--show-prompts"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "subProcess": true,
+            "stopOnEntry": false,
+        },
+        {
+            "name": "Code Agent Debug - Interactive",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "gaia.cli",
+            "args": [
+                "code",
+                "--interactive",
+                "--debug"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "subProcess": true,
+            "stopOnEntry": false,
+        },
+        {
+            "name": "Code Agent Debug - Init GAIA.md",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "gaia.cli",
+            "args": [
+                "code",
+                "/init",
+                "--debug"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "subProcess": true,
+            "stopOnEntry": false,
+        },
+        {
+            "name": "Code Agent Debug - Todo App",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "gaia.cli",
+            "args": [
+                "code",
+                "Create a simple todo application",
+                "--debug",
+                "--show-prompts"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "subProcess": true,
+            "stopOnEntry": false,
+        },
+        {
+            "name": "Code Agent Debug - Function Generation",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "gaia.cli",
+            "args": [
+                "code",
+                "Generate a function to calculate fibonacci numbers",
+                "--debug"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "subProcess": true,
+            "stopOnEntry": false,
+        },
+        {
+            "name": "Code Agent Debug - REST API",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "gaia.cli",
+            "args": [
+                "code",
+                "Create a REST API for user management",
+                "--debug",
+                "--show-prompts",
+                "--max-steps",
+                "50"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "subProcess": true,
+            "stopOnEntry": false,
+        },
+        {
+            "name": "Code Agent Debug - Test Generation",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "gaia.cli",
+            "args": [
+                "code",
+                "Generate unit tests for my_module.py",
+                "--debug"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "subProcess": true,
+            "stopOnEntry": false,
+        },
+        {
+            "name": "Code Agent Debug - With Breakpoint",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "gaia.cli",
+            "args": [
+                "code",
+                "Create a calculator function",
+                "--debug"
+            ],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "subProcess": true,
+            "stopOnEntry": true,
+            "purpose": "Use this to set breakpoints before execution starts"
+        },
+        {
             "name": "GAIA Pytest Debug",
             "type": "debugpy",
             "request": "launch",

@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 from typing import Any, Dict, List, Optional
 
 from gaia.agents.base.console import AgentConsole, SilentConsole
@@ -69,7 +70,7 @@ class Agent(abc.ABC):
         show_prompts: bool = False,
         output_dir: str = None,
         streaming: bool = False,
-        show_stats: bool = True,
+        show_stats: bool = False,
         silent_mode: bool = False,
         debug: bool = False,
     ):
@@ -86,7 +87,7 @@ class Agent(abc.ABC):
             show_prompts: If True, displays prompts sent to LLM in console (default: False)
             output_dir: Directory for storing JSON output files (default: current directory)
             streaming: If True, enables real-time streaming of LLM responses (default: False)
-            show_stats: If True, displays LLM performance stats after each response (default: True)
+            show_stats: If True, displays LLM performance stats after each response (default: False)
             silent_mode: If True, suppresses all console output for JSON-only usage (default: False)
             debug: If True, enables debug output for troubleshooting (default: False)
 
@@ -124,6 +125,7 @@ class Agent(abc.ABC):
 
         # Initialize ChatSDK with proper configuration
         # Note: We don't set system_prompt in config, we pass it per request
+        # Note: Context size is configured when starting Lemonade server, not here
         chat_config = ChatConfig(
             model=model_id or "Qwen2.5-0.5B-Instruct-CPU",
             use_claude=use_claude,
@@ -131,6 +133,7 @@ class Agent(abc.ABC):
             claude_model=claude_model,
             show_stats=show_stats,
             max_history_length=20,  # Keep more history for agent conversations
+            max_tokens=4096,  # Increased for complex code generation
         )
         self.chat = ChatSDK(chat_config)
         self.model_id = model_id
@@ -610,10 +613,59 @@ class Agent(abc.ABC):
             result = tool(**tool_args)
             logger.debug(f"Tool execution result: {result}")
             return result
+        except subprocess.TimeoutExpired as e:
+            # Handle subprocess timeout specifically
+            error_msg = f"Tool {tool_name} timed out: {str(e)}"
+            logger.error(error_msg)
+            self.error_history.append(error_msg)
+            return {"status": "error", "error": error_msg, "timeout": True}
         except Exception as e:
             logger.error(f"Error executing tool {tool_name}: {str(e)}")
             self.error_history.append(str(e))
             return {"status": "error", "error": str(e)}
+
+    def _generate_max_steps_message(
+        self, conversation: List[Dict], steps_taken: int, steps_limit: int
+    ) -> str:
+        """Generate informative message when max steps is reached.
+
+        Args:
+            conversation: The conversation history
+            steps_taken: Number of steps actually taken
+            steps_limit: Maximum steps allowed
+
+        Returns:
+            Informative message about what was accomplished
+        """
+        # Analyze what was done
+        tool_calls = [
+            msg
+            for msg in conversation
+            if msg.get("role") == "assistant" and "tool_calls" in msg
+        ]
+
+        tools_used = []
+        for msg in tool_calls:
+            for tool_call in msg.get("tool_calls", []):
+                if "function" in tool_call:
+                    tools_used.append(tool_call["function"]["name"])
+
+        message = f"⚠️ Reached maximum steps limit ({steps_limit} steps)\n\n"
+        message += f"Completed {steps_taken} steps using these tools:\n"
+
+        # Count tool usage
+        from collections import Counter
+
+        tool_counts = Counter(tools_used)
+        for tool, count in tool_counts.most_common(10):
+            message += f"  - {tool}: {count}x\n"
+
+        message += "\nTo continue or complete this task:\n"
+        message += "1. Review the generated files and progress so far\n"
+        message += f"2. Run with --max-steps {steps_limit + 50} to allow more steps\n"
+        message += "3. Or complete remaining tasks manually\n"
+
+        return message
 
     def _write_json_to_file(self, data: Dict[str, Any], filename: str = None) -> str:
         """
@@ -745,6 +797,12 @@ IMPORTANT: Your response must be a single valid JSON object.
 Use double quotes for keys and string values. Ensure all fields are present.
 DO NOT include text, markdown, or explanations outside the JSON structure.
 NEVER wrap your response in code blocks or backticks.
+
+CONTINUING WORK: When a plan completes, evaluate if more work is needed:
+- If more work is needed (validation, testing, fixing), create a NEW plan
+- Only provide an "answer" when ALL work is truly complete
+- Format for new plan: {{"thought": "...", "goal": "...", "plan": [...]}}
+- Format for completion: {{"thought": "...", "goal": "...", "answer": "..."}}
         """
 
         return reminder
@@ -826,6 +884,37 @@ NEVER wrap your response in code blocks or backticks.
             steps_taken += 1
             logger.debug(f"Step {steps_taken}/{steps_limit}")
 
+            # Check if we're at the limit and ask user if they want to continue
+            if steps_taken == steps_limit and final_answer is None:
+                # Show what was accomplished
+                max_steps_msg = self._generate_max_steps_message(
+                    conversation, steps_taken, steps_limit
+                )
+                self.console.print_warning(max_steps_msg)
+
+                # Ask user if they want to continue (skip in silent mode)
+                if not hasattr(self, "silent_mode") or not self.silent_mode:
+                    try:
+                        response = (
+                            input("\nContinue with 50 more steps? (y/n): ")
+                            .strip()
+                            .lower()
+                        )
+                        if response in ["y", "yes"]:
+                            steps_limit += 50
+                            self.console.print_info(
+                                f"✓ Continuing with {steps_limit} total steps...\n"
+                            )
+                        else:
+                            self.console.print_info("Stopping at user request.")
+                            break
+                    except (EOFError, KeyboardInterrupt):
+                        self.console.print_info("\nStopping at user request.")
+                        break
+                else:
+                    # Silent mode - just stop
+                    break
+
             # Display current step
             self.console.print_step_header(steps_taken, steps_limit)
 
@@ -880,7 +969,7 @@ NEVER wrap your response in code blocks or backticks.
                     self.console.print_tool_usage(tool_name)
 
                     # Start progress indicator for tool execution
-                    self.console.start_progress("Executing tool")
+                    self.console.start_progress(f"Executing {tool_name}")
 
                     # Execute the tool
                     tool_result = self._execute_tool(tool_name, tool_args)
@@ -960,7 +1049,12 @@ NEVER wrap your response in code blocks or backticks.
                             completion_message = (
                                 f"You have successfully completed all steps in the plan for: {user_input}\n"
                                 f"Previous outputs:\n{truncated_outputs}\n\n"
-                                f"Please provide a final answer summarizing what you've accomplished.\n\n"
+                                f"Check if more work is needed:\n"
+                                f"- If you created a project, you MUST create a NEW PLAN to validate/test it\n"
+                                f"- If you fixed code, you MUST create a NEW PLAN to verify the fixes\n"
+                                f"- Only provide an 'answer' if ALL work (creation AND validation) is complete\n\n"
+                                f'If more work needed: Provide a NEW plan with {{"thought": "...", "goal": "...", "plan": [...]}}\n'
+                                f'If everything is complete: Provide {{"thought": "...", "goal": "...", "answer": "..."}}\n\n'
                                 f"{self._add_format_reminder()}"
                             )
 
@@ -1412,7 +1506,7 @@ NEVER wrap your response in code blocks or backticks.
                     self.console.pretty_print_json(tool_args, "Arguments")
 
                 # Start progress indicator for tool execution
-                self.console.start_progress("Executing tool")
+                self.console.start_progress(f"Executing {tool_name}")
 
                 # Check for repeated tool calls
                 if last_tool_call == (tool_name, str(tool_args)):
@@ -1557,7 +1651,9 @@ NEVER wrap your response in code blocks or backticks.
             "result": (
                 final_answer
                 if final_answer
-                else "Maximum steps reached without final answer"
+                else self._generate_max_steps_message(
+                    conversation, steps_taken, steps_limit
+                )
             ),
             "system_prompt": self.system_prompt,  # Include system prompt in the result
             "conversation": conversation,

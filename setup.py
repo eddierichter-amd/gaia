@@ -38,6 +38,7 @@ setup(
         "gaia.agents.blender.core",
         "gaia.agents.docker",
         "gaia.agents.jira",
+        "gaia.agents.code",
     ],
     package_data={
         "gaia.eval": [
