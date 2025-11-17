@@ -664,7 +664,12 @@ Generate ONLY the code, no explanations."""
             return self._get_timeout_placeholder(filename, purpose)
 
     def _fix_code_with_llm(
-        self, code: str, error_msg: str, context: str = "", max_attempts: int = 3
+        self,
+        code: str,
+        file_path: str,
+        error_msg: str,
+        context: str = "",
+        max_attempts: int = 3,
     ) -> Optional[str]:
         """Fix code using LLM based on error message.
 
@@ -680,6 +685,7 @@ Generate ONLY the code, no explanations."""
         for attempt in range(max_attempts):
             prompt = f"""Fix the following Python code error:
 
+File path: {file_path}
 Error: {error_msg}
 
 Code:
