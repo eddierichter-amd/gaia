@@ -113,7 +113,6 @@ MANDATORY TEST REQUIREMENTS:
 - Include edge cases and error handling tests
 
 IMPORTANT: When you see:
-- "is_valid": false in read_python_file → Fix the syntax error shown in "errors"
 - "has_errors": true in execute_python_file → Fix the error shown in "stderr"
 - Issues in analyze_with_pylint → Use fix_linting_errors or edit_python_file
 - "status": "error" in any tool result → READ the error message and fix the issue:
