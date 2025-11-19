@@ -842,6 +842,14 @@ class Agent(abc.ABC):
         Defaults to 20000 chars which is appropriate for 32K token context window.
         """
 
+        # If we have test_results in the output we don't want to
+        # truncate as this can contain important information on
+        # how to fix the tests
+        if isinstance(content, dict) and (
+            "test_results" in content or "run_tests" in content
+        ):
+            return json.dumps(content)
+
         # Convert to string (use compact JSON first to check size)
         if isinstance(content, (dict, list)):
             compact_str = json.dumps(content)

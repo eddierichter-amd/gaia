@@ -37,6 +37,8 @@ def get_system_prompt(gaia_md_path: Optional[str] = None) -> str:
 
 {gaia_context}
 
+CRITICAL: When reviewing test results in the conversation history, ALWAYS look at the LAST/MOST RECENT test result to determine the current status. Earlier test results in the conversation are historical debugging information and may contain stale or outdated information. Only the final test result reflects the current state of the code and tests.
+
 Your responses must be valid JSON with this structure:
 {{"thought": "reasoning", "goal": "objective", "plan": [list of tool calls]}}
 
@@ -63,17 +65,21 @@ After create_project completes successfully, you MUST create a NEW plan to valid
    - auto_fix_syntax_errors(project_name) - Fix any syntax issues
    - analyze_with_pylint(project_name) - Check code quality
    - fix_code(project_name/file.py) - Fix any errors found by pylint (if needed)
-
+   - run_tests(project_name) - Run all tests to ensure functionality
 4. Run TESTS to validate (DO NOT run main.py as it may wait for input and timeout):
    - Use run_tests tool to run pytest on the entire test suite
    - Check the "tests_passed" field in the result - if FALSE, tests have FAILED
-   - If "tests_passed": false OR "return_code": 1, examine the errors and fix them
+   - If "tests_passed": false OR "return_code": 1, examine the errors one by one and fix them
    - Re-run tests until "tests_passed": true
 
+CRITICAL: The FINAL step in EVERY plan MUST be a run_tests call so you always know the current
+test status before starting the next plan.
 CRITICAL: DO NOT execute main.py - it may be a web server or interactive app that hangs!
 CRITICAL: Use run_tests tool to validate ALL tests at once with pytest!
 CRITICAL: Check "tests_passed" field - if false, tests FAILED (do NOT claim success)!
 CRITICAL: Task is complete ONLY when: pylint passes AND "tests_passed": true!
+CRITICAL: DO NOT just list files and read files without taking action! Every plan must include either run_tests to verify current status OR fix_code to address specific issues OR create_project to create the project. Avoid exploration-only plans - always work towards creating, testing or fixing code.
+
 
 Example validation plan:
 {{"plan": [
@@ -86,6 +92,13 @@ Example validation plan:
 
 If run_tests fails, create a NEW plan to fix the errors and re-run tests!
 
+Example plan to fix errors:
+{{"plan": [
+  {{"tool": "fix_code", "tool_args": {{"file_path": "todo_app/main.py", "error_description": "Description of first error"}}}},
+  {{"tool": "fix_code", "tool_args": {{"file_path": "todo_app/main.py", "error_description": "Description of second error"}}}},
+  {{"tool": "run_tests", "tool_args": {{"project_path": "todo_app"}}}}
+]}}
+
 IMPORTANT: When creating any Python project, ALWAYS include:
 1. README.md - With project overview, features, installation, and usage instructions
 2. requirements.txt - List all required packages with versions
@@ -93,13 +106,14 @@ IMPORTANT: When creating any Python project, ALWAYS include:
 For project creation: Use create_project to generate files, then CONTINUE with validation.
 For code generation: Use generate_function, generate_class, or generate_test.
 For file operations: Use read_file, write_python_file, edit_python_file.
-For error fixing: Use auto_fix_syntax_errors to scan projects, or fix_code for individual files.
+For file operations: Use read_python_file, write_python_file, edit_python_file.
+For error fixing: Use auto_fix_syntax_errors to scan projects, or fix_code for individual files. When multiple errors appear, focus on one error at a time - split them up and call fix_code separately for each error, passing the exact error wording to help the tool fix the issue.
 
 CRITICAL: After creating any Python project or code:
 1. Run validate_project to check structure and fix common issues
 2. Run auto_fix_syntax_errors to fix any truncated or broken files
 3. Run analyze_with_pylint on the ENTIRE PROJECT FOLDER to get all errors at once
-4. Use fix_code on each file that has errors (based on pylint results)
+4. Use fix_code on each error individually (based on pylint results), providing the exact error message in error_description
 5. Run execute_python_file on main.py to test the application
 6. Run execute_python_file on test files to verify tests pass
 7. If execution fails (has_errors: true), read the stderr output and fix the errors

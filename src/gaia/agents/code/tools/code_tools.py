@@ -698,7 +698,7 @@ Code:
 Return ONLY the corrected code, no explanations."""
 
             try:
-                response = self.chat.send(prompt)
+                response = self.chat.send(prompt, timeout=600)
                 fixed_code = response.text.strip()
 
                 # Extract code from markdown blocks
