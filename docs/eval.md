@@ -405,12 +405,53 @@ Transform synthetic data into evaluation standards.
 gaia groundtruth -d ./output/test_data -p "*.txt" --use-case summarization -o ./output/groundtruth
 gaia groundtruth -d ./output/test_data -p "*.pdf" --use-case qa -o ./output/groundtruth
 gaia groundtruth -d ./output/test_data -p "*.txt" --use-case email -o ./output/groundtruth
+
+# Default behavior: skip files that already have ground truth generated
+gaia groundtruth -d ./output/test_data -o ./output/groundtruth
+
+# Force regeneration of ALL ground truth files (useful for testing prompt changes)
+gaia groundtruth -d ./output/test_data -o ./output/groundtruth --force
 ```
 
 **Use case options:**
 - `qa` - Question-answer pair generation (requires groundtruth input for batch-experiment)
 - `summarization` - Summary generation tasks (supports both embedded and external groundtruth)
 - `email` - Email processing tasks (supports both embedded and external groundtruth)
+
+#### Skip Existing Ground Truth Files
+
+Ground truth generation automatically skips files that already have ground truth data to avoid redundant processing and API costs.
+
+**Default Behavior**: Automatically skip files where ground truth JSON already exists in the output directory.
+
+**How it works:**
+- Checks for existing `.groundtruth.json` files in the output directory
+- Skips files where ground truth has already been generated
+- Includes skipped files in the consolidated report
+- Logs which files were skipped vs newly processed
+
+**CLI Options:**
+- `--force`: Force regeneration of all ground truth files, even if they already exist (overrides default skip behavior)
+
+**Usage Scenarios:**
+
+**Resume Interrupted Ground Truth Generation:**
+```bash
+# Default behavior: automatically skip any files that already have ground truth
+gaia groundtruth -d ./output/test_data -o ./output/groundtruth
+```
+
+**Force Regeneration After Prompt Changes:**
+```bash
+# Force regeneration of ALL ground truth files (useful for testing new prompts)
+gaia groundtruth -d ./output/test_data -o ./output/groundtruth --force
+```
+
+**Benefits:**
+- **Cost Optimization**: Avoid redundant Claude API calls for expensive ground truth generation
+- **Reliability**: Resume interrupted runs without losing progress
+- **Efficiency**: Only process new files when adding to existing ground truth
+- **Development Speed**: Faster iteration during prompt and configuration development
 
 ### Batch Experimentation
 

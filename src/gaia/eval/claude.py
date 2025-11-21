@@ -19,7 +19,15 @@ load_dotenv()
 class ClaudeClient:
     log = get_logger(__name__)
 
-    def __init__(self, model=None, max_tokens=1024):
+    def __init__(self, model=None, max_tokens=1024, max_retries=3):
+        """
+        Initialize Claude client with retry support.
+
+        Args:
+            model: Claude model to use (defaults to DEFAULT_CLAUDE_MODEL)
+            max_tokens: Maximum tokens in response (default: 1024)
+            max_retries: Maximum number of retry attempts for API calls with exponential backoff (default: 3)
+        """
         if model is None:
             model = DEFAULT_CLAUDE_MODEL
         self.log = self.__class__.log  # Use the class-level logger for instances
@@ -34,10 +42,19 @@ class ClaudeClient:
             )
             self.log.error(error_msg)
             raise ValueError(error_msg)
-        self.client = anthropic.Anthropic(api_key=self.api_key)
+        # Initialize Anthropic client with retry support
+        # The SDK handles exponential backoff automatically
+        self.client = anthropic.Anthropic(
+            api_key=self.api_key,
+            max_retries=max_retries,
+            timeout=300.0,  # 5 minute timeout for large documents
+        )
         self.model = model
         self.max_tokens = max_tokens
-        self.log.info(f"Initialized ClaudeClient with model: {model}")
+        self.max_retries = max_retries
+        self.log.info(
+            f"Initialized ClaudeClient with model: {model}, max_retries: {max_retries}"
+        )
 
     def calculate_cost(self, input_tokens, output_tokens):
         """

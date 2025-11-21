@@ -1092,6 +1092,9 @@ Examples:
 
   # Generate 10 Q&A pairs per document (RAG only)
   gaia groundtruth -d ./data/html/blender --num-samples 10
+
+  # Force regeneration of all ground truth files
+  gaia groundtruth -d ./data/html/blender --force
         """,
     )
 
@@ -1152,6 +1155,11 @@ Examples:
         type=int,
         default=5,
         help="Number of Q&A pairs to generate per document (RAG use case only, default: 5)",
+    )
+    gt_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force regeneration of all ground truth files, even if they already exist (default: skip existing)",
     )
 
     # Add new subparser for creating evaluation templates
@@ -2513,6 +2521,7 @@ Let me know your answer!
                     input_dir=args.directory,
                     file_pattern=args.pattern,
                     use_case=use_case,
+                    force=args.force,
                     prompt=custom_prompt,
                     save_text=save_text,
                     output_dir=args.output_dir,
