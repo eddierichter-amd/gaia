@@ -37,6 +37,7 @@ except ImportError:
 
 from gaia.chat.sdk import ChatConfig, ChatSDK
 from gaia.logger import get_logger
+from gaia.security import PathValidator
 
 
 @dataclass
@@ -70,6 +71,8 @@ class RAGConfig:
     )
     # VLM settings (enabled if available, errors out if model can't be loaded)
     vlm_model: str = "Qwen2.5-VL-7B-Instruct-GGUF"
+    # Security settings
+    allowed_paths: Optional[List[str]] = None
 
 
 @dataclass
@@ -153,6 +156,9 @@ class RAGSDK:
         )
         self.chat = ChatSDK(chat_config)
 
+        # Initialize path validator
+        self.path_validator = PathValidator(self.config.allowed_paths)
+
         self.log.debug("RAG SDK initialized")
 
     def _check_dependencies(self):
@@ -173,12 +179,7 @@ class RAGSDK:
 
     def _safe_open(self, file_path: str, mode="rb"):
         """
-        Safely open file with O_NOFOLLOW to prevent symlink attacks (TOCTOU prevention).
-
-        This prevents Time-of-Check-Time-of-Use vulnerabilities by:
-        1. Using O_NOFOLLOW flag to reject symlinks atomically
-        2. Opening file with low-level os.open() which doesn't follow symlinks
-        3. Validating the opened file descriptor, not the path
+        Safely open file with path validation and O_NOFOLLOW to prevent symlink attacks.
 
         Args:
             file_path: Path to file
@@ -188,9 +189,13 @@ class RAGSDK:
             File handle
 
         Raises:
-            PermissionError: If file is a symlink or not a regular file
+            PermissionError: If file is outside allowed paths or is a symlink
             IOError: If file cannot be opened
         """
+        # Security check: Validate path against allowed directories
+        if not self.path_validator.is_path_allowed(file_path):
+            raise PermissionError(f"Access denied: {file_path} is not in allowed paths")
+
         import stat
 
         # Determine flags based on mode

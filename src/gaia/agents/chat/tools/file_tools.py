@@ -41,10 +41,8 @@ class FileToolsMixin:
         def add_watch_directory(directory: str) -> Dict[str, Any]:
             """Add directory to watch list with path validation and auto-indexing."""
             try:
-                # Validate path with user confirmation
-                if not self.session_manager.validate_directory(
-                    directory, operation="watch"
-                ):
+                # Validate path with PathValidator (handles user prompting and persistence)
+                if not self.path_validator.is_path_allowed(directory):
                     return {"status": "error", "error": f"Access denied: {directory}"}
 
                 if not os.path.exists(directory):

@@ -166,12 +166,22 @@ class ShellToolsMixin:
                         }
 
                     # Validate path is allowed
-                    if not self._is_path_allowed(working_directory):
-                        return {
-                            "status": "error",
-                            "error": f"Access denied: {working_directory} is not in allowed paths",
-                            "has_errors": True,
-                        }
+                    # Use PathValidator if available (ChatAgent), otherwise fallback or skip
+                    if hasattr(self, "path_validator"):
+                        if not self.path_validator.is_path_allowed(working_directory):
+                            return {
+                                "status": "error",
+                                "error": f"Access denied: {working_directory} is not in allowed paths",
+                                "has_errors": True,
+                            }
+                    elif hasattr(self, "_is_path_allowed"):
+                        # Backward compatibility
+                        if not self._is_path_allowed(working_directory):
+                            return {
+                                "status": "error",
+                                "error": f"Access denied: {working_directory} is not in allowed paths",
+                                "has_errors": True,
+                            }
 
                     cwd = str(Path(working_directory).resolve())
                 else:
@@ -193,6 +203,64 @@ class ShellToolsMixin:
                         "error": "Empty command",
                         "has_errors": True,
                     }
+
+                # Validate arguments for path traversal
+                # This prevents "cat ../secret.txt" even if "cat" is allowed
+                if hasattr(self, "path_validator"):
+                    for arg in cmd_parts[1:]:
+                        # Skip flags that don't look like paths (simple heuristics)
+                        # We check for path separators or ".."
+                        # We also handle --flag=/path/to/file
+
+                        candidate_path = arg
+                        if arg.startswith("-"):
+                            if "=" in arg:
+                                _, candidate_path = arg.split("=", 1)
+                            else:
+                                # Skip flags without value (e.g. -l, --verbose)
+                                # But what about -f/path? Hard to parse without knowing the tool.
+                                # We'll assume if it has a path separator, it might be a path attached to a flag
+                                if os.sep not in arg and "/" not in arg:
+                                    continue
+                                # If it has separators, treat the whole thing or part of it as path?
+                                # Treating "-f/tmp" as a path "/tmp" is hard.
+                                # Let's be conservative: if it contains separators, check it.
+
+                        # Check if it looks like a path
+                        if (
+                            os.sep in candidate_path
+                            or "/" in candidate_path
+                            or ".." in candidate_path
+                        ):
+                            # Ignore URLs
+                            if candidate_path.startswith(
+                                ("http://", "https://", "git://", "ssh://")
+                            ):
+                                continue
+
+                            # Resolve path relative to CWD
+                            try:
+                                # Handle potential flag prefix if we didn't split it cleanly
+                                # This is best-effort.
+                                clean_path = candidate_path
+
+                                # Resolve
+                                resolved_path = str(
+                                    Path(cwd).joinpath(clean_path).resolve()
+                                )
+
+                                if not self.path_validator.is_path_allowed(
+                                    resolved_path
+                                ):
+                                    return {
+                                        "status": "error",
+                                        "error": f"Access denied: Argument '{arg}' resolves to forbidden path '{resolved_path}'",
+                                        "has_errors": True,
+                                    }
+                            except Exception:
+                                # If we can't resolve it (e.g. invalid chars), we might warn or ignore.
+                                # For security, maybe ignore if it's not a valid path anyway?
+                                pass
 
                 # Security: WHITELIST approach - only allow explicitly safe commands
                 # This is much safer than a blacklist which always misses dangerous commands

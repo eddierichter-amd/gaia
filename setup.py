@@ -62,6 +62,7 @@ setup(
         "python-dotenv",
         "aiohttp",
         "rich",
+        "watchdog>=2.1.0",
     ],
     extras_require={
         "api": [
@@ -122,7 +123,15 @@ setup(
             "pypdf",
             "sentence-transformers",
             "faiss-cpu>=1.7.0",
-            "watchdog>=2.1.0",
+        ],
+        "lint": [
+            "black",
+            "pylint",
+            "isort",
+            "flake8",
+            "autoflake",
+            "mypy",
+            "bandit",
         ],
     },
     classifiers=[],

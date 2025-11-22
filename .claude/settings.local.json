@@ -46,7 +46,8 @@
       "Bash(gaia chat:*)",
       "Bash(gaia jira --help:*)",
       "Bash(gaia --help:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(echo:*)"
     ],
     "deny": []
   },

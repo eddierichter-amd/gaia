@@ -50,6 +50,13 @@ class FileIOToolsMixin:
                 Dictionary with file content and type-specific metadata
             """
             try:
+                # Security check
+                if not self.path_validator.is_path_allowed(file_path):
+                    return {
+                        "status": "error",
+                        "error": f"Access denied: {file_path} is not in allowed paths",
+                    }
+
                 if not os.path.exists(file_path):
                     return {"status": "error", "error": f"File not found: {file_path}"}
 
@@ -187,6 +194,13 @@ class FileIOToolsMixin:
                             "syntax_errors": validation.get("errors", []),
                         }
 
+                # Security check
+                if not self.path_validator.is_path_allowed(file_path):
+                    return {
+                        "status": "error",
+                        "error": f"Access denied: {file_path} is not in allowed paths",
+                    }
+
                 # Create parent directories if needed
                 if create_dirs and os.path.dirname(file_path):
                     os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -225,6 +239,13 @@ class FileIOToolsMixin:
                 Dictionary with edit operation results
             """
             try:
+                # Security check
+                if not self.path_validator.is_path_allowed(file_path):
+                    return {
+                        "status": "error",
+                        "error": f"Access denied: {file_path} is not in allowed paths",
+                    }
+
                 # Read current content
                 if not os.path.exists(file_path):
                     return {"status": "error", "error": f"File not found: {file_path}"}
@@ -307,6 +328,13 @@ class FileIOToolsMixin:
                 Dictionary with search results
             """
             try:
+                # Security check
+                if not self.path_validator.is_path_allowed(directory):
+                    return {
+                        "status": "error",
+                        "error": f"Access denied: {directory} is not in allowed paths",
+                    }
+
                 results = []
                 files_searched = 0
                 files_with_matches = 0
@@ -376,6 +404,13 @@ class FileIOToolsMixin:
                 Dictionary with diff information
             """
             try:
+                # Security check
+                if not self.path_validator.is_path_allowed(file_path):
+                    return {
+                        "status": "error",
+                        "error": f"Access denied: {file_path} is not in allowed paths",
+                    }
+
                 # Read original content
                 if os.path.exists(file_path):
                     with open(file_path, "r", encoding="utf-8") as f:
@@ -432,6 +467,13 @@ class FileIOToolsMixin:
                 Dictionary with write operation results
             """
             try:
+                # Security check
+                if not self.path_validator.is_path_allowed(file_path):
+                    return {
+                        "status": "error",
+                        "error": f"Access denied: {file_path} is not in allowed paths",
+                    }
+
                 # Create parent directories if needed
                 if create_dirs:
                     os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -473,6 +515,13 @@ class FileIOToolsMixin:
                 from datetime import datetime
 
                 gaia_path = os.path.join(project_root, "GAIA.md")
+
+                # Security check
+                if not self.path_validator.is_path_allowed(gaia_path):
+                    return {
+                        "status": "error",
+                        "error": f"Access denied: {gaia_path} is not in allowed paths",
+                    }
 
                 # Start building content
                 content = "# GAIA.md\n\n"
@@ -550,6 +599,13 @@ class FileIOToolsMixin:
                 Dictionary with replacement result
             """
             try:
+                # Security check
+                if not self.path_validator.is_path_allowed(file_path):
+                    return {
+                        "status": "error",
+                        "error": f"Access denied: {file_path} is not in allowed paths",
+                    }
+
                 if not os.path.exists(file_path):
                     return {"status": "error", "error": f"File not found: {file_path}"}
 

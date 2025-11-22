@@ -17,6 +17,7 @@ from pathlib import Path
 from gaia.agents.base.agent import Agent
 from gaia.agents.base.api_agent import ApiAgent
 from gaia.agents.base.console import AgentConsole, SilentConsole
+from gaia.security import PathValidator
 
 from .system_prompt import get_system_prompt
 from .tools import (
@@ -107,6 +108,10 @@ class CodeAgent(
         # Ensure .gaia cache directory exists for temporary files
         self.cache_dir = Path.home() / ".gaia" / "cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+        # Security: Configure allowed paths for file operations
+        self.allowed_paths = kwargs.pop("allowed_paths", None)
+        self.path_validator = PathValidator(self.allowed_paths)
 
         # Project planning state
         self.plan = None

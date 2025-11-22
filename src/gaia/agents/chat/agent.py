@@ -4,7 +4,6 @@
 Chat Agent - Interactive chat with RAG and file search capabilities.
 """
 
-import logging
 import os
 import time
 from dataclasses import dataclass, field
@@ -19,9 +18,11 @@ from gaia.agents.base.console import AgentConsole
 from gaia.agents.chat.session import SessionManager
 from gaia.agents.chat.tools import FileToolsMixin, RAGToolsMixin, ShellToolsMixin
 from gaia.agents.tools import FileSearchToolsMixin  # Shared file search tools
+from gaia.logger import get_logger
 from gaia.rag.sdk import RAGSDK, RAGConfig
+from gaia.security import PathValidator
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -247,6 +248,9 @@ class ChatAgent(
         if config is None:
             config = ChatAgentConfig()
 
+        # Initialize path validator
+        self.path_validator = PathValidator(config.allowed_paths)
+
         # Now use config for all initialization
         # Store RAG configuration from config
         self.rag_documents = config.rag_documents
@@ -275,18 +279,23 @@ class ChatAgent(
         # Store max_chunks for adaptive retrieval
         self.base_max_chunks = config.max_chunks
 
-        # Initialize RAG SDK
-        rag_config = RAGConfig(
-            model=effective_model_id,
-            chunk_size=config.chunk_size,
-            chunk_overlap=config.chunk_overlap,  # Configurable overlap for context preservation
-            max_chunks=config.max_chunks,
-            show_stats=config.show_stats,
-            use_local_llm=not (config.use_claude or config.use_chatgpt),
-            use_llm_chunking=config.use_llm_chunking,  # Enable semantic chunking
-            base_url=config.base_url,  # Pass base_url to RAG for VLM client
-        )
-        self.rag = RAGSDK(rag_config)
+        # Initialize RAG SDK (optional - will be None if dependencies not installed)
+        try:
+            rag_config = RAGConfig(
+                model=effective_model_id,
+                chunk_size=config.chunk_size,
+                chunk_overlap=config.chunk_overlap,  # Configurable overlap for context preservation
+                max_chunks=config.max_chunks,
+                show_stats=config.show_stats,
+                use_local_llm=not (config.use_claude or config.use_chatgpt),
+                use_llm_chunking=config.use_llm_chunking,  # Enable semantic chunking
+                base_url=config.base_url,  # Pass base_url to RAG for VLM client
+            )
+            self.rag = RAGSDK(rag_config)
+        except ImportError as e:
+            # RAG dependencies not installed - this is fine, RAG features will be disabled
+            logger.debug(f"RAG dependencies not available: {e}")
+            self.rag = None
 
         # File system monitoring
         self.observers = []
@@ -314,9 +323,14 @@ class ChatAgent(
             debug=config.debug,
         )
 
-        # Index initial documents
-        if self.rag_documents:
+        # Index initial documents (only if RAG is available)
+        if self.rag_documents and self.rag:
             self._index_documents(self.rag_documents)
+        elif self.rag_documents and not self.rag:
+            logger.warning(
+                "RAG dependencies not installed. Cannot index documents. "
+                "Install with: pip install gaia[rag]"
+            )
 
         # Start watching directories
         if self.watch_directories:
@@ -797,9 +811,10 @@ When user asks to "index my data folder" or similar:
         tools_description = self._format_tools_for_prompt()
         self.system_prompt += f"\n\n==== AVAILABLE TOOLS ====\n{tools_description}\n\n"
 
-        logger.debug(
-            f"Updated system prompt with {len(self.rag.indexed_files)} indexed documents"
-        )
+        if self.rag:
+            logger.debug(
+                f"Updated system prompt with {len(self.rag.indexed_files)} indexed documents"
+            )
 
     def _start_watching(self) -> None:
         """Start watching directories for changes."""
@@ -820,6 +835,12 @@ When user asks to "index my data folder" or similar:
 
     def reindex_file(self, file_path: str) -> None:
         """Reindex a file that was modified or created."""
+        if not self.rag:
+            logger.warning(
+                f"Cannot reindex {file_path}: RAG dependencies not installed"
+            )
+            return
+
         try:
             logger.info(f"Reindexing: {file_path}")
             # Use the new reindex_document method which removes old chunks first
@@ -858,14 +879,20 @@ When user asks to "index my data folder" or similar:
 
             self.current_session = session
 
-            # Restore indexed documents
-            for doc_path in session.indexed_documents:
-                if os.path.exists(doc_path):
-                    try:
-                        self.rag.index_document(doc_path)
-                        self.indexed_files.add(doc_path)
-                    except Exception as e:
-                        logger.warning(f"Failed to reindex {doc_path}: {e}")
+            # Restore indexed documents (only if RAG is available)
+            if self.rag:
+                for doc_path in session.indexed_documents:
+                    if os.path.exists(doc_path):
+                        try:
+                            self.rag.index_document(doc_path)
+                            self.indexed_files.add(doc_path)
+                        except Exception as e:
+                            logger.warning(f"Failed to reindex {doc_path}: {e}")
+            elif session.indexed_documents:
+                logger.warning(
+                    f"Cannot restore {len(session.indexed_documents)} indexed documents: "
+                    "RAG dependencies not installed"
+                )
 
             # Restore watched directories
             for dir_path in session.watched_directories:
