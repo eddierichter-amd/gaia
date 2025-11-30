@@ -32,7 +32,13 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 
 ## Prerequisites
 
-1. **GAIA Installation**: Follow the [Development Guide](./dev.md)
+1. **GAIA Installation**: Install GAIA with API support
+   ```bash
+   # Linux/Windows:
+   pip install -e .[api]
+   ```
+   This installs FastAPI and Uvicorn, which are required for the API server.
+
 2. **Lemonade Server**: Must be running with sufficient context size
    ```bash
    lemonade-server serve --ctx-size 32768
@@ -213,14 +219,15 @@ For more troubleshooting, see [FAQ](./faq.md).
 
 ## VSCode Integration
 
-The GAIA API Server works with VSCode's Language Model Provider extension.
+The GAIA API Server works with VSCode's Language Model Provider extension, allowing you to use GAIA Code directly in your editor.
 
-**Setup:**
-1. Start API server: `gaia api start`
-2. Install VSCode extension: `code --install-extension gaia-vscode-0.1.0.vsix`
-3. Select GAIA model from VSCode model picker
+**Quick Setup:**
+1. Start Lemonade server: `lemonade-server serve --ctx-size 32768`
+2. Start API server: `gaia api start`
+3. Build and install VSCode extension (see [VSCode Integration Guide](./vscode.md))
+4. Select GAIA model from VSCode model picker
 
-For complete VSCode integration guide, see [VSCode Integration Documentation](./vscode.md).
+**For complete setup instructions, see the [VSCode Integration Documentation](./vscode.md).**
 
 ## Technical Documentation
 

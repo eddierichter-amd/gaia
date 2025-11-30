@@ -132,6 +132,7 @@ gaia --help
 - **`talk`**: Start a voice-based conversation session
 - **`code`**: Python code assistant with analysis, generation, and linting (see [Code Guide](./code.md))
 - **`blender`**: Create and modify 3D scenes using the Blender agent (see [Blender Guide](./blender.md))
+- **`api`**: Start and manage the GAIA API Server for VSCode and OpenAI-compatible integrations (see [API Server Guide](./api.md))
 - **`mcp`**: Start and manage MCP (Model Context Protocol) bridge servers for integration with external clients and services (see [MCP Bridge Guide](./mcp.md))
 - **`stats`**: View model performance statistics from the most recent run
 - **`test`**: Run various audio/speech tests for development and troubleshooting
@@ -266,6 +267,158 @@ During an interactive chat session, you can use these special commands:
 - `quit`, `exit`, or `bye` - End the chat session
 
 **Requirements**: The lemonade server must be running. The chat maintains conversation context automatically and supports both streaming and non-streaming modes.
+
+## API Command
+
+The GAIA API Server provides an OpenAI-compatible REST API that exposes GAIA agents as "models". This enables integration with VSCode extensions, IDEs, and other tools that support OpenAI's API format.
+
+**Prerequisites**: Install GAIA with API support - see [API Server Prerequisites](./api.md#prerequisites).
+
+**For complete API documentation including usage examples and integration guides, see the [API Server Guide](./api.md).**
+
+### Quick Start
+
+```bash
+# 1. Start Lemonade server with extended context (required for Code agent)
+lemonade-server serve --ctx-size 32768
+
+# 2. Start GAIA API server
+gaia api start
+
+# 3. Test the server
+curl http://localhost:8080/health
+```
+
+### Available Subcommands
+
+- **`start`** - Start the GAIA API server
+- **`status`** - Check if the API server is running
+- **`stop`** - Stop the GAIA API server
+
+### Command Details
+
+#### Start API Server
+
+```bash
+gaia api start [OPTIONS]
+```
+
+**Available options:**
+- `--host` - Server host address (default: localhost)
+- `--port` - Server port (default: 8080)
+- `--background` - Run server in background mode
+- `--debug` - Enable debug logging
+
+**Examples:**
+```bash
+# Start in foreground (default)
+gaia api start
+
+# Start in background
+gaia api start --background
+
+# Start with debug logging
+gaia api start --debug
+
+# Start on custom host and port
+gaia api start --host 0.0.0.0 --port 8888
+```
+
+**Expected output:**
+```
+Starting GAIA API server on http://localhost:8080
+INFO:     Started server process
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+```
+
+#### Check API Server Status
+
+```bash
+gaia api status
+```
+
+Shows whether the API server is currently running and displays connection information.
+
+**Example output:**
+```
+GAIA API Server is running on http://localhost:8080
+```
+
+#### Stop API Server
+
+```bash
+gaia api stop
+```
+
+Stops the running API server gracefully.
+
+**Example output:**
+```
+Stopping GAIA API server...
+Server stopped successfully.
+```
+
+### Available Models
+
+The API server exposes GAIA agents as models:
+
+| Model ID | Description | Requirements |
+|----------|-------------|--------------|
+| `gaia-code` | Autonomous code development agent | Lemonade with `--ctx-size 32768` |
+
+### VSCode Integration
+
+The API server enables GAIA Code integration with Visual Studio Code:
+
+1. Start the API server: `gaia api start`
+2. Install the GAIA VSCode extension
+3. Select GAIA models from VSCode's model picker
+
+**For complete VSCode setup, see the [VSCode Integration Guide](./vscode.md).**
+
+### Testing the API
+
+```bash
+# Check server health
+curl http://localhost:8080/health
+
+# List available models
+curl http://localhost:8080/v1/models
+
+# Send a test request
+curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gaia-code",
+    "messages": [{"role": "user", "content": "Write a hello world function"}]
+  }'
+```
+
+### Common Issues
+
+**Port already in use:**
+```bash
+# Use a different port
+gaia api start --port 8888
+```
+
+**Connection refused:**
+```bash
+# Verify server is running
+gaia api status
+
+# Check health endpoint
+curl http://localhost:8080/health
+```
+
+**Agent processing failed:**
+```bash
+# Ensure Lemonade server is running with correct context size
+lemonade-server serve --ctx-size 32768
+```
+
+For more troubleshooting, see the [API Server Guide](./api.md#troubleshooting).
 
 ## Talk Command
 
