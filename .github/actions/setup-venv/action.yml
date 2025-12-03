@@ -86,7 +86,8 @@ runs:
         }
 
         # Create venv with uv (will download Python if needed)
-        uv venv $VENV_PATH --python $PYTHON_VERSION
+        # --seed includes pip, setuptools, wheel for packages that require pip internally (e.g., spacy)
+        uv venv $VENV_PATH --python $PYTHON_VERSION --seed
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
         $PYTHON_PATH = "$VENV_PATH\Scripts\python.exe"
@@ -122,7 +123,8 @@ runs:
         fi
 
         # Create venv with uv (will download Python if needed)
-        uv venv "$VENV_PATH" --python "$PYTHON_VERSION"
+        # --seed includes pip, setuptools, wheel for packages that require pip internally (e.g., spacy)
+        uv venv "$VENV_PATH" --python "$PYTHON_VERSION" --seed
 
         PYTHON_PATH="$VENV_PATH/bin/python"
 

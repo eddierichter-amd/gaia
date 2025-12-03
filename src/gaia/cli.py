@@ -31,7 +31,9 @@ except ImportError:
     CodeAgent = None
     CODE_AVAILABLE = False
 from gaia.llm.lemonade_client import (
+    DEFAULT_HOST,
     DEFAULT_MODEL_NAME,
+    DEFAULT_PORT,
     LemonadeClient,
     LemonadeClientError,
 )
@@ -90,11 +92,14 @@ def print_lemonade_error(for_code_agent=False):
         "❌ Error: Lemonade server is not running or not accessible.", file=sys.stderr
     )
     print("", file=sys.stderr)
-    print("Please start the Lemonade server first by:", file=sys.stderr)
+    print(
+        "GAIA will automatically start Lemonade Server if installed.", file=sys.stderr
+    )
+    print("If auto-start fails, you can start it manually by:", file=sys.stderr)
     print("  • Double-clicking the desktop shortcut, or", file=sys.stderr)
     if for_code_agent:
         print(
-            "  • Running: lemonade-server serve --ctx-size 32768  (for Code Agent)",
+            "  • Running: lemonade-server serve --ctx-size 32768",
             file=sys.stderr,
         )
     else:
@@ -102,7 +107,7 @@ def print_lemonade_error(for_code_agent=False):
     print("", file=sys.stderr)
     if for_code_agent:
         print(
-            "Note: Code Agent requires larger context size (32768 tokens)",
+            "Note: GAIA requires larger context size (32768 tokens)",
             file=sys.stderr,
         )
         print("", file=sys.stderr)
@@ -111,6 +116,77 @@ def print_lemonade_error(for_code_agent=False):
         file=sys.stderr,
     )
     print("Then try your command again.", file=sys.stderr)
+
+
+def initialize_lemonade_for_agent(
+    agent: str,
+    auto_start: bool = True,
+    quiet: bool = False,
+    skip_if_external: bool = False,
+    use_claude: bool = False,
+    use_chatgpt: bool = False,
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+):
+    """
+    Initialize Lemonade Server for a specific GAIA agent.
+
+    This function uses agent-specific profiles to ensure the correct context size
+    and model requirements are met. It provides consistent initialization across
+    all GAIA CLI commands.
+
+    Args:
+        agent: Agent name (chat, code, talk, rag, blender, jira, docker, vlm, minimal, mcp)
+        auto_start: Automatically start server if not running
+        quiet: Suppress output (only errors)
+        skip_if_external: If True, skip initialization when using Claude/ChatGPT
+        use_claude: Whether Claude API is being used
+        use_chatgpt: Whether ChatGPT API is being used
+        host: Host address of the Lemonade server
+        port: Port number of the Lemonade server
+
+    Returns:
+        Tuple of (success: bool, base_url: str, version: str)
+
+    Example:
+        success, base_url, version = initialize_lemonade_for_agent("chat")
+        if not success:
+            sys.exit(1)
+    """
+    log = get_logger(__name__)
+
+    # Skip initialization if using external API
+    if skip_if_external and (use_claude or use_chatgpt):
+        return True, f"http://{host}:{port}/api/v1", None
+
+    try:
+        client = LemonadeClient(host=host, port=port, keep_alive=True, verbose=False)
+        status = client.initialize(
+            agent=agent,
+            auto_start=auto_start,
+            quiet=quiet,
+        )
+
+        if not status.running:
+            if not quiet:
+                print_lemonade_error(for_code_agent=(agent in ["code", "chat"]))
+            return False, None, None
+
+        # Get server version for logging/debugging
+        server_version = client.get_lemonade_version()
+
+        # Use the client's base_url which is configured for the correct API version
+        base_url = client.base_url
+
+        # Warning for context size is already printed by initialize()
+        # Return True even if context size is small (warning was shown)
+        return True, base_url, server_version
+
+    except Exception as e:
+        log.error(f"Lemonade initialization failed: {e}")
+        if not quiet:
+            print(f"❌ Lemonade initialization failed: {e}", file=sys.stderr)
+        return False, None, None
 
 
 def check_mcp_health(host="localhost", port=9876):
@@ -283,47 +359,34 @@ class GaiaCliClient:
 async def async_main(action, **kwargs):
     log = get_logger(__name__)
 
-    # Check Lemonade health for actions that require LLM (unless using external APIs)
-    # Skip check when --use-claude or --use-chatgpt is specified (applies to ALL agents)
-    needs_lemonade = action in [
-        "prompt",
-        "chat",
-        "talk",
-        "stats",
-        "code",
-        "blender",
-        "jira",
-    ]
-    using_external_api = kwargs.get("use_claude") or kwargs.get("use_chatgpt")
+    # Map actions to agent profiles for Lemonade initialization
+    # Each agent has specific model and context size requirements
+    # Note: code, blender, jira, docker are handled by their own handler functions
+    action_to_agent = {
+        "prompt": "minimal",  # Basic prompts use minimal profile
+        "chat": "chat",
+        "talk": "talk",
+        "stats": "minimal",
+    }
 
-    if needs_lemonade and not using_external_api:
-        if not check_lemonade_health():
-            # Chat and Code agents both need large context (32768)
-            needs_large_context = action in ["chat", "code"]
+    # Initialize Lemonade with agent-specific profile
+    lemonade_base_url = kwargs.get("base_url")  # May be None if not specified
+    if action in action_to_agent:
+        agent_profile = action_to_agent[action]
+        success, detected_base_url, _server_version = initialize_lemonade_for_agent(
+            agent=agent_profile,
+            auto_start=True,
+            skip_if_external=True,
+            use_claude=kwargs.get("use_claude", False),
+            use_chatgpt=kwargs.get("use_chatgpt", False),
+        )
+        if not success:
+            sys.exit(1)
 
-            # Auto-start lemonade server for chat and code
-            if needs_large_context:
-                print(
-                    "🚀 Starting Lemonade server with large context (32768 tokens)..."
-                )
-
-                try:
-                    client = LemonadeClient(verbose=True, keep_alive=True)
-                    client.launch_server(background="silent", ctx_size=32768)
-                    print("✅ Lemonade server started successfully")
-
-                    # Verify it's healthy
-                    time.sleep(2)  # Give it a moment to fully start
-                    if not check_lemonade_health():
-                        print_lemonade_error(for_code_agent=True)
-                        sys.exit(1)
-                except Exception as e:
-                    print(f"❌ Failed to start Lemonade server: {e}")
-                    print_lemonade_error(for_code_agent=True)
-                    sys.exit(1)
-            else:
-                print_lemonade_error(for_code_agent=needs_large_context)
-                sys.exit(1)
+        # Use detected base_url if not explicitly provided
+        if lemonade_base_url is None:
+            lemonade_base_url = detected_base_url
+            kwargs["base_url"] = detected_base_url
 
     # Create client for actions that use GaiaCliClient (not chat - it uses ChatAgent)
     client = None
@@ -1624,6 +1687,17 @@ Examples:
         action="store_true",
         help="Enable verbose logging for all HTTP requests",
     )
+    mcp_start_parser.add_argument(
+        "--no-lemonade-check",
+        action="store_true",
+        help="Skip Lemonade Server health check (not recommended)",
+    )
+    mcp_start_parser.add_argument(
+        "--ctx-size",
+        type=int,
+        default=32768,
+        help="Context size for Lemonade Server (default: 32768 for coding)",
+    )
 
     # MCP status command
     mcp_status_parser = mcp_subparsers.add_parser(
@@ -2387,8 +2461,15 @@ Let me know your answer!
 
     # Handle LLM command
     if args.action == "llm":
+        # Initialize Lemonade with minimal profile for direct LLM queries
+        if not initialize_lemonade_for_agent(
+            agent="minimal",
+            auto_start=False,
+            quiet=False,
+        ):
+            return
+
         try:
-            # Fast import and execution - health check happens in LLMClient
             from gaia.apps.llm.app import main as llm
 
             response = llm(
@@ -3503,21 +3584,22 @@ def handle_code_command(args):
         log.error("Code agent is not available. Please check your installation.")
         return
 
-    # Check if using local Lemonade server (not Claude or ChatGPT)
-    using_local = not getattr(args, "use_claude", False) and not getattr(
-        args, "use_chatgpt", False
-    )
-
     # Get base_url from args or environment
     base_url = getattr(args, "base_url", None)
     if base_url is None:
         base_url = os.getenv("LEMONADE_BASE_URL", "http://localhost:8000/api/v1")
 
-    # Check Lemonade health if using local server and localhost
-    # Skip health check for remote servers (e.g., devtunnel URLs)
-    if using_local and ("localhost" in base_url or "127.0.0.1" in base_url):
-        if not check_lemonade_health():
-            print_lemonade_error(for_code_agent=True)
+    # Initialize Lemonade with code agent profile (32768 context)
+    # Skip for remote servers (e.g., devtunnel URLs) or external APIs
+    is_local = "localhost" in base_url or "127.0.0.1" in base_url
+    if is_local:
+        if not initialize_lemonade_for_agent(
+            agent="code",
+            auto_start=True,
+            skip_if_external=True,
+            use_claude=getattr(args, "use_claude", False),
+            use_chatgpt=getattr(args, "use_chatgpt", False),
+        ):
             sys.exit(1)
 
     try:
@@ -3703,6 +3785,16 @@ def handle_jira_command(args):
     """
     log = get_logger(__name__)
 
+    # Initialize Lemonade with jira agent profile (32768 context)
+    if not initialize_lemonade_for_agent(
+        agent="jira",
+        auto_start=True,
+        skip_if_external=True,
+        use_claude=getattr(args, "use_claude", False),
+        use_chatgpt=getattr(args, "use_chatgpt", False),
+    ):
+        sys.exit(1)
+
     try:
         # Import and use JiraApp directly (no MCP needed)
         from gaia.apps.jira.app import main as jira_main
@@ -3739,6 +3831,16 @@ def handle_docker_command(args):
         args: Parsed command line arguments for the docker command
     """
     log = get_logger(__name__)
+
+    # Initialize Lemonade with docker agent profile (32768 context)
+    if not initialize_lemonade_for_agent(
+        agent="docker",
+        auto_start=True,
+        skip_if_external=True,
+        use_claude=getattr(args, "use_claude", False),
+        use_chatgpt=getattr(args, "use_chatgpt", False),
+    ):
+        sys.exit(1)
 
     try:
         # Import and use DockerApp directly
@@ -3780,6 +3882,14 @@ def handle_api_command(args):
     log = get_logger(__name__)
 
     if args.subcommand == "start":
+        # Initialize Lemonade with mcp profile (API server needs LLM backend)
+        if not initialize_lemonade_for_agent(
+            agent="mcp",
+            auto_start=False,
+            quiet=False,
+        ):
+            return
+
         try:
             import uvicorn
 
@@ -4076,12 +4186,16 @@ def handle_blender_command(args):
         print("Install blender dependencies with: pip install -e .[blender]")
         sys.exit(1)
 
-    # Check if Lemonade server is running
-    log.info("Checking Lemonade server connectivity...")
-    if not check_lemonade_health():
-        print_lemonade_error()
+    # Initialize Lemonade with blender agent profile (32768 context)
+    log.info("Initializing Lemonade for Blender agent...")
+    if not initialize_lemonade_for_agent(
+        agent="blender",
+        auto_start=True,
+        skip_if_external=True,
+        use_claude=getattr(args, "use_claude", False),
+        use_chatgpt=getattr(args, "use_chatgpt", False),
+    ):
         sys.exit(1)
-    log.info("✅ Lemonade server is accessible")
 
     # Check if Blender MCP server is running
     mcp_port = getattr(args, "mcp_port", 9876)
@@ -4182,6 +4296,16 @@ def handle_mcp_start(args):
 
         # Import and start the HTTP-native MCP bridge
         from gaia.mcp.mcp_bridge import start_server as start_mcp_http
+
+        # Initialize Lemonade with mcp agent profile (unless --no-lemonade-check)
+        if not getattr(args, "no_lemonade_check", False):
+            if not initialize_lemonade_for_agent(
+                agent="mcp",
+                auto_start=False,  # MCP doesn't auto-start, just check
+                quiet=False,
+            ):
+                return
+            print("")  # Add blank line before MCP output
 
         # Handle background mode
         if args.background:

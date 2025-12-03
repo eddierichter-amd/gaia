@@ -265,7 +265,7 @@ Most GAIA CLI commands require the Lemonade server to be running. If you install
 ### Option 2: Already Included with GAIA Installer
 If you installed GAIA using our unified installer, Lemonade server is already included. Simply:
 1. Double-click the GAIA-CLI desktop shortcut
-2. Run `lemonade-server serve` in the command prompt to start the server
+2. GAIA will automatically start Lemonade Server when needed. You can also start it manually by running `lemonade-server serve`
 
 **Note**: The Lemonade server provides OpenAI-compatible REST API endpoints and enables hybrid NPU/iGPU acceleration on Ryzen AI systems. For more details, see the [AMD Ryzen AI documentation](https://ryzenai.docs.amd.com/en/latest/llm/server_interface.html).
 
@@ -319,7 +319,7 @@ gaia blender --example 2                        # Run specific example
 - `youtube` - Download YouTube transcripts
 - `kill` - Kill processes on specific ports
 
-**Note**: Most commands require the Lemonade server to be running. Start it by double-clicking the desktop shortcut or running `lemonade-server serve`.
+**Note**: Most commands require the Lemonade server. GAIA will automatically start Lemonade Server when needed. You can also start it manually by double-clicking the desktop shortcut or running `lemonade-server serve`.
 
 **Blender Command**: The `blender` command additionally requires a Blender MCP server. See [CLI documentation](docs/cli.md#blender-command) for setup instructions.
 

@@ -189,7 +189,7 @@ For information on managing dependencies and configuring Dependabot for automate
 
 Once the installation and environment variables are set, run the following:
 
-1. Start the Lemonade server (required for LLM operations):
+1. **Lemonade Server**: GAIA will automatically start Lemonade Server when needed. If you prefer to start it manually (or for troubleshooting):
     ```bash
     lemonade-server serve
     ```
@@ -202,7 +202,11 @@ Once the installation and environment variables are set, run the following:
 1. Run `gaia -h` to see CLI options.
 1. Try the chat feature with a simple query:
     ```bash
-    gaia chat "What is artificial intelligence?"
+    gaia chat --query "What is artificial intelligence?"
+    ```
+    Or use the shorter `-q` flag:
+    ```bash
+    gaia chat -q "What is artificial intelligence?"
     ```
     Or start an interactive chat session:
     ```bash

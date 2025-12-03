@@ -48,12 +48,15 @@ runs:
 
         echo "✅ Cleanup complete"
 
-    - name: Clear pip cache
+    - name: Clear package manager caches
       shell: bash
       run: |
-        echo "Clearing pip cache..."
-        pip cache purge || true
-        echo "✅ Pip cache cleared"
+        echo "Clearing package manager caches..."
+        # Clear pip cache if pip is available
+        pip cache purge 2>/dev/null || true
+        # Clear uv cache if uv is available
+        uv cache clean 2>/dev/null || true
+        echo "✅ Package caches cleared"
 
     - name: Display disk space after cleanup
       shell: bash

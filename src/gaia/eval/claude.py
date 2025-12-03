@@ -6,8 +6,16 @@ import json
 import os
 from pathlib import Path
 
-import anthropic
-from bs4 import BeautifulSoup
+try:
+    import anthropic
+except ImportError:
+    anthropic = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
 from dotenv import load_dotenv
 
 from gaia.eval.config import DEFAULT_CLAUDE_MODEL, MODEL_PRICING
@@ -28,6 +36,27 @@ class ClaudeClient:
             max_tokens: Maximum tokens in response (default: 1024)
             max_retries: Maximum number of retry attempts for API calls with exponential backoff (default: 3)
         """
+        # Check for required dependencies
+        if anthropic is None:
+            error_msg = (
+                "\n❌ Error: Missing required package 'anthropic'\n\n"
+                "Please install the eval dependencies:\n"
+                "  pip install -e .[eval]\n\n"
+                "Or install anthropic directly:\n"
+                "  pip install anthropic\n"
+            )
+            raise ImportError(error_msg)
+
+        if BeautifulSoup is None:
+            error_msg = (
+                "\n❌ Error: Missing required package 'bs4' (BeautifulSoup4)\n\n"
+                "Please install the eval dependencies:\n"
+                "  pip install -e .[eval]\n\n"
+                "Or install beautifulsoup4 directly:\n"
+                "  pip install beautifulsoup4\n"
+            )
+            raise ImportError(error_msg)
+
         if model is None:
             model = DEFAULT_CLAUDE_MODEL
         self.log = self.__class__.log  # Use the class-level logger for instances

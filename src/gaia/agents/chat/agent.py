@@ -10,8 +10,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from watchdog.events import FileSystemEventHandler
-from watchdog.observers import Observer
+try:
+    from watchdog.events import FileSystemEventHandler
+    from watchdog.observers import Observer
+except ImportError:
+    # Create dummy base class when watchdog is not available
+    class FileSystemEventHandler:
+        """Dummy base class when watchdog is not installed."""
+
+    Observer = None
 
 from gaia.agents.base.agent import Agent
 from gaia.agents.base.console import AgentConsole
@@ -823,6 +830,18 @@ When user asks to "index my data folder" or similar:
 
     def _watch_directory(self, directory: str) -> None:
         """Watch a directory for file changes."""
+        if Observer is None:
+            error_msg = (
+                "\n❌ Error: Missing required package 'watchdog'\n\n"
+                "File watching requires the watchdog package.\n"
+                "Please install the required dependencies:\n"
+                "  pip install -e .[dev]\n\n"
+                "Or install watchdog directly:\n"
+                "  pip install watchdog>=2.1.0\n"
+            )
+            logger.error(error_msg)
+            raise ImportError(error_msg)
+
         try:
             event_handler = FileChangeHandler(self)
             observer = Observer()

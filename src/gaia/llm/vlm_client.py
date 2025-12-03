@@ -99,6 +99,9 @@ class VLMClient:
         """
         Ensure VLM model is loaded, load it if necessary.
 
+        The model will be automatically downloaded if not available (handled by
+        lemonade_client.chat_completions with auto_download=True).
+
         Returns:
             True if VLM is loaded, False if loading failed
         """
@@ -111,13 +114,17 @@ class VLMClient:
 
         try:
             logger.info(f"📥 Loading VLM model: {self.vlm_model}")
-            self.client.load_model(self.vlm_model, timeout=60)
+            # Load model (auto-download handled by lemonade_client, may take hours)
+            self.client.load_model(self.vlm_model, timeout=60, auto_download=True)
             self.vlm_loaded = True
             logger.info(f"✅ VLM model loaded: {self.vlm_model}")
             return True
 
         except Exception as e:
             logger.error(f"Failed to load VLM model: {e}")
+            logger.error(
+                "   Make sure Lemonade server is running at http://localhost:8000"
+            )
             return False
 
     def extract_from_image(

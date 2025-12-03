@@ -172,10 +172,14 @@ class RAGSDK:
             missing.append("faiss-cpu")
 
         if missing:
-            raise ImportError(
-                f"Missing required dependencies: {', '.join(missing)}. "
-                f"Install with: pip install {' '.join(missing)}"
+            error_msg = (
+                f"\n❌ Error: Missing required RAG dependencies: {', '.join(missing)}\n\n"
+                f"Please install the RAG dependencies:\n"
+                f"  pip install -e .[rag]\n\n"
+                f"Or install packages directly:\n"
+                f"  pip install {' '.join(missing)}\n"
             )
+            raise ImportError(error_msg)
 
     def _safe_open(self, file_path: str, mode="rb"):
         """

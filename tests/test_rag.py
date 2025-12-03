@@ -190,7 +190,7 @@ class TestRAGSDK:
             with pytest.raises(ImportError) as exc_info:
                 RAGSDK()
 
-            assert "Missing required dependencies" in str(exc_info.value)
+            assert "Missing required RAG dependencies" in str(exc_info.value)
 
     def test_text_chunking(self, mock_dependencies):
         """Test text chunking functionality."""
@@ -542,7 +542,7 @@ class TestErrorHandling:
             with pytest.raises(ImportError) as exc_info:
                 RAGSDK()._check_dependencies()
 
-            assert "Missing required dependencies" in str(exc_info.value)
+            assert "Missing required RAG dependencies" in str(exc_info.value)
 
     def test_invalid_pdf_file(self):
         """Test handling of invalid PDF files."""

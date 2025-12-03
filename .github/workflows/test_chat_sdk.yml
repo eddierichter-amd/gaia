@@ -52,7 +52,9 @@ jobs:
             exit 1
           }
           Write-Host "Found gaia at: $($gaiaPath.Source)"
-          python -m pip check
+          # Use uv pip check since uv venvs don't include pip by default
+          $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
+          uv pip check --python .venv\Scripts\python.exe
 
       - name: Install Lemonade Server
         uses: ./.github/actions/install-lemonade

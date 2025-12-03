@@ -38,7 +38,7 @@ jobs:
 
     - name: Install additional test dependencies
       run: |
-        uv pip install --system pytest-cov
+        uv pip install pytest-cov --python .venv/bin/python
 
     - name: Run RAG unit tests
       run: |
@@ -67,8 +67,9 @@ jobs:
         install-package: '.[dev,rag]'
 
     - name: Install additional test dependencies
+      shell: powershell
       run: |
-        uv pip install --system reportlab
+        uv pip install reportlab --python .venv\Scripts\python.exe
 
     - name: Install Lemonade Server
       uses: ./.github/actions/install-lemonade

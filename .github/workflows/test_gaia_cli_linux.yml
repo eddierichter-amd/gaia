@@ -57,7 +57,7 @@ jobs:
       - name: Install Lemonade SDK
         run: |
           echo "=== Installing Lemonade SDK ==="
-          uv pip install --system lemonade-sdk
+          uv pip install lemonade-sdk --python .venv/bin/python
 
           echo "=== Verifying Lemonade Installation ==="
           lemonade-server-dev -h

@@ -17,7 +17,7 @@ GAIA (Generative AI Acceleration Infrastructure & Applications) provides a comma
 
 3. Once installed, double click on the desktop icon **GAIA-CLI** to launch the command-line shell with the GAIA environment activated.
 
-4. The GAIA CLI connects to the Lemonade server for AI processing. Make sure the server is running by:
+4. The GAIA CLI connects to the Lemonade server for AI processing. GAIA will automatically start Lemonade Server when needed. If auto-start fails, you can start it manually by:
    - Double-clicking the desktop shortcut, or
    - Running: `lemonade-server serve`
 

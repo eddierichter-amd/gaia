@@ -5,7 +5,17 @@
 import logging
 import os
 import time
-from typing import Any, Callable, Dict, Iterator, Literal, Optional, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Literal,
+    Optional,
+    TypeVar,
+    Union,
+)
 
 import httpx
 
@@ -92,8 +102,10 @@ class LLMClient:
                 ),
                 max_retries=0,  # Disable retries to fail fast on connection issues
             )
+            # Use completions endpoint for pre-formatted prompts (ChatSDK compatibility)
+            # Use chat endpoint when messages array is explicitly provided
             self.endpoint = "completions"
-            # self.endpoint = "responses" TODO: Put back once new Lemonade version is released.
+            logger.debug("Using Lemonade completions endpoint")
             self.default_model = DEFAULT_MODEL_NAME
             self.claude_client = None
             logger.debug(f"Using local LLM with model={self.default_model}")
@@ -182,20 +194,25 @@ class LLMClient:
         self,
         prompt: str,
         model: Optional[str] = None,
-        endpoint: Optional[Literal["completions", "responses"]] = None,
+        endpoint: Optional[Literal["completions", "chat", "claude", "openai"]] = None,
         system_prompt: Optional[str] = None,
         stream: bool = False,
+        messages: Optional[List[Dict[str, str]]] = None,
         **kwargs: Any,
     ) -> Union[str, Iterator[str]]:
         """
         Generate a response from the LLM.
 
         Args:
-            prompt: The user prompt/query to send to the LLM
+            prompt: The user prompt/query to send to the LLM. For chat endpoint,
+                   if messages is not provided, this is treated as a pre-formatted
+                   prompt string that already contains the full conversation.
             model: The model to use (defaults to endpoint-appropriate model)
-            endpoint: Override the endpoint to use (completions or responses)
+            endpoint: Override the endpoint to use (completions, chat, claude, or openai)
             system_prompt: System prompt to use for this specific request (overrides default)
             stream: If True, returns a generator that yields chunks of the response as they become available
+            messages: Optional list of message dicts with 'role' and 'content' keys.
+                     If provided, these are used directly for chat completions instead of prompt.
             **kwargs: Additional parameters to pass to the API
 
         Returns:
@@ -272,38 +289,19 @@ class LLMClient:
                 logger.error(f"Error generating response from Claude API: {str(e)}")
                 raise
         elif endpoint_to_use == "completions":
-            # For local LLM, use the prompt as-is
-            # ChatSDK handles all formatting including system prompts
-            effective_prompt = prompt
-            logger.debug(f"Using raw prompt for local LLM: {effective_prompt[:200]}...")
+            # For local LLM with pre-formatted prompts (ChatSDK uses this)
+            # The prompt already contains the full formatted conversation
+            logger.debug(
+                f"Using completions endpoint: prompt_length={len(prompt)} chars"
+            )
 
             try:
-                # Set stream parameter in the API call
-                # Stop tokens should be provided by caller if needed
-                logger.debug(
-                    f"📤 Sending to Lemonade: model={model}, prompt_length={len(effective_prompt)} chars"
-                )
-
-                # Log prompt tail for debugging empty responses
-                if len(effective_prompt) > 500:
-                    logger.debug(
-                        f"📜 Prompt tail (last 500 chars): ...{effective_prompt[-500:]}"
-                    )
-                    # Check for system message followed by assistant (the actual bug)
-                    if (
-                        "<|im_end|>\n<|im_start|>assistant\n" in effective_prompt[-100:]
-                        and "<|im_start|>system\n" in effective_prompt[-600:]
-                    ):
-                        logger.warning(
-                            "⚠️ Tool result added as system message - causes empty response with Qwen"
-                        )
-
                 # Use retry logic for the API call
                 response = self._retry_with_exponential_backoff(
                     self.client.completions.create,
                     model=model,
-                    prompt=effective_prompt,
-                    temperature=0.1,  # Lower temperature for more consistent JSON output
+                    prompt=prompt,
+                    temperature=0.1,
                     stream=stream,
                     **kwargs,
                 )
@@ -322,11 +320,8 @@ class LLMClient:
                 else:
                     # Return the complete response
                     result = response.choices[0].text
-
-                    # Check for empty responses
                     if not result or not result.strip():
                         logger.warning("Empty response from local LLM")
-
                     return result
             except (
                 httpx.ConnectError,
@@ -337,10 +332,110 @@ class LLMClient:
                 error_msg = f"LLM Server Connection Error: {str(e)}"
                 raise ConnectionError(error_msg) from e
             except Exception as e:
-                logger.error(f"Error generating response from local LLM: {str(e)}")
-                # Check if this is a network-related error
-                if "network" in str(e).lower() or "connection" in str(e).lower():
-                    raise ConnectionError(f"LLM Server Error: {str(e)}") from e
+                error_str = str(e)
+                logger.error(f"Error generating response from local LLM: {error_str}")
+
+                if "404" in error_str:
+                    if (
+                        "endpoint" in error_str.lower()
+                        or "not found" in error_str.lower()
+                    ):
+                        raise ConnectionError(
+                            f"API endpoint error: {error_str}\n\n"
+                            "This may indicate:\n"
+                            "  1. Lemonade Server version mismatch (try updating to 9.0.4)\n"
+                            "  2. Model not properly loaded or corrupted\n\n"
+                            "To fix model issues, try:\n"
+                            "  lemonade model remove <model-name>\n"
+                            "  lemonade model download <model-name>\n"
+                        ) from e
+
+                if "network" in error_str.lower() or "connection" in error_str.lower():
+                    raise ConnectionError(f"LLM Server Error: {error_str}") from e
+                raise
+        elif endpoint_to_use == "chat":
+            # For local LLM using chat completions format (Lemonade v9+)
+            if messages:
+                # Use provided messages directly (proper chat history support)
+                chat_messages = list(messages)
+                # Prepend system prompt if provided and not already in messages
+                if effective_system_prompt and (
+                    not chat_messages or chat_messages[0].get("role") != "system"
+                ):
+                    chat_messages.insert(
+                        0, {"role": "system", "content": effective_system_prompt}
+                    )
+            else:
+                # Treat prompt as pre-formatted string (legacy ChatSDK support)
+                # Pass as single user message - the prompt already contains formatted history
+                chat_messages = []
+                if effective_system_prompt:
+                    chat_messages.append(
+                        {"role": "system", "content": effective_system_prompt}
+                    )
+                chat_messages.append({"role": "user", "content": prompt})
+            logger.debug(
+                f"Using chat completions for local LLM: {len(chat_messages)} messages"
+            )
+
+            try:
+                # Use retry logic for the API call
+                response = self._retry_with_exponential_backoff(
+                    self.client.chat.completions.create,
+                    model=model,
+                    messages=chat_messages,
+                    temperature=0.1,
+                    stream=stream,
+                    **kwargs,
+                )
+
+                if stream:
+                    # Return a generator that yields chunks
+                    def stream_generator():
+                        for chunk in response:
+                            if (
+                                hasattr(chunk.choices[0].delta, "content")
+                                and chunk.choices[0].delta.content
+                            ):
+                                yield chunk.choices[0].delta.content
+
+                    return stream_generator()
+                else:
+                    # Return the complete response
+                    result = response.choices[0].message.content
+                    if not result or not result.strip():
+                        logger.warning("Empty response from local LLM")
+                    return result
+            except (
+                httpx.ConnectError,
+                httpx.TimeoutException,
+                httpx.NetworkError,
+            ) as e:
+                logger.error(f"Network error connecting to local LLM server: {str(e)}")
+                error_msg = f"LLM Server Connection Error: {str(e)}"
+                raise ConnectionError(error_msg) from e
+            except Exception as e:
+                error_str = str(e)
+                logger.error(f"Error generating response from local LLM: {error_str}")
+
+                # Check for 404 errors which might indicate endpoint or model issues
+                if "404" in error_str:
+                    if (
+                        "endpoint" in error_str.lower()
+                        or "not found" in error_str.lower()
+                    ):
+                        raise ConnectionError(
+                            f"API endpoint error: {error_str}\n\n"
+                            "This may indicate:\n"
+                            "  1. Lemonade Server version mismatch (try updating to 9.0.4)\n"
+                            "  2. Model not properly loaded or corrupted\n\n"
+                            "To fix model issues, try:\n"
+                            "  lemonade model remove <model-name>\n"
+                            "  lemonade model download <model-name>\n"
+                        ) from e
+
+                if "network" in error_str.lower() or "connection" in error_str.lower():
+                    raise ConnectionError(f"LLM Server Error: {error_str}") from e
                 raise
         elif endpoint_to_use == "openai":
             # For OpenAI API, use the messages format
@@ -381,7 +476,7 @@ class LLMClient:
                 raise
         else:
             raise ValueError(
-                f"Unsupported endpoint: {endpoint_to_use}. Supported endpoints: 'completions', 'claude', 'openai'."
+                f"Unsupported endpoint: {endpoint_to_use}. Supported endpoints: 'completions', 'chat', 'claude', 'openai'."
             )
 
     def get_performance_stats(self) -> Dict[str, Any]:

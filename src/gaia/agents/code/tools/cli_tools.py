@@ -915,7 +915,17 @@ class CLIToolsMixin:
                     except (psutil.TimeoutExpired, ProcessLookupError):
                         pass  # Continue to SIGTERM
 
-                    # Send SIGTERM
+                    # Send SIGTERM (Unix only - killpg not available on Windows)
+                    if hasattr(os, "killpg"):
+                        try:
+                            os.killpg(os.getpgid(pid), signal.SIGTERM)
+                            proc.wait(timeout=2)
+                            return  # Success!
+                        except (OSError, ProcessLookupError, psutil.TimeoutExpired):
+                            pass  # Continue to SIGKILL
+
+                # Force kill with SIGKILL (Unix) or terminate (Windows)
+                if hasattr(os, "killpg") and hasattr(signal, "SIGKILL"):
                     try:
                         # pylint: disable=no-member
                         os.killpg(os.getpgid(pid), signal.SIGTERM)

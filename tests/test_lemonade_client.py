@@ -448,7 +448,10 @@ class TestLemonadeClientMock(unittest.TestCase):
             ]
 
             with self.assertRaises(LemonadeClientError) as context:
-                self.client.chat_completions(model=TEST_MODEL, messages=messages)
+                # Disable auto_download to prevent retry logic from calling /load endpoint
+                self.client.chat_completions(
+                    model=TEST_MODEL, messages=messages, auto_download=False
+                )
 
             self.assertIn("404", str(context.exception))
             self.assertIn(error_message, str(context.exception))
