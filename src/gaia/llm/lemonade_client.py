@@ -27,18 +27,45 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Union
 import openai  # For exception types
 import psutil
 import requests
+from dotenv import load_dotenv
 
 # Import OpenAI client for internal use
 from openai import OpenAI
 
 from gaia.logger import get_logger
 
+# Load environment variables from .env file
+load_dotenv()
+
 # =========================================================================
 # Server Configuration Defaults
 # =========================================================================
-# Default server host and port
+# Default server host and port (can be overridden via LEMONADE_BASE_URL env var)
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 8000
+DEFAULT_LEMONADE_URL = f"http://{DEFAULT_HOST}:{DEFAULT_PORT}"
+
+
+def _get_lemonade_config() -> tuple:
+    """
+    Get Lemonade host and port from environment or defaults.
+
+    Parses LEMONADE_BASE_URL env var if set, otherwise uses defaults.
+
+    Returns:
+        Tuple of (host, port)
+    """
+    base_url = os.getenv("LEMONADE_BASE_URL")
+    if base_url:
+        # Parse the URL to extract host and port
+        from urllib.parse import urlparse
+
+        parsed = urlparse(base_url)
+        host = parsed.hostname or DEFAULT_HOST
+        port = parsed.port or DEFAULT_PORT
+        return (host, port)
+    return (DEFAULT_HOST, DEFAULT_PORT)
+
 
 # API version supported by this client
 LEMONADE_API_VERSION = "v1"
@@ -103,7 +130,9 @@ class LemonadeStatus:
     """Status of Lemonade Server"""
 
     running: bool = False
-    url: str = "http://localhost:8000"
+    url: str = field(
+        default_factory=lambda: os.getenv("LEMONADE_BASE_URL", DEFAULT_LEMONADE_URL)
+    )
     context_size: int = 0
     loaded_models: list = field(default_factory=list)
     health_data: dict = field(default_factory=dict)
@@ -395,8 +424,8 @@ class LemonadeClient:
     def __init__(
         self,
         model: Optional[str] = None,
-        host: str = DEFAULT_HOST,
-        port: int = DEFAULT_PORT,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
         verbose: bool = True,
         keep_alive: bool = False,
     ):
@@ -405,14 +434,16 @@ class LemonadeClient:
 
         Args:
             model: Name of the model to load (optional)
-            host: Host address of the Lemonade server
-            port: Port number of the Lemonade server
+            host: Host address of the Lemonade server (defaults to LEMONADE_BASE_URL env var)
+            port: Port number of the Lemonade server (defaults to LEMONADE_BASE_URL env var)
             verbose: If False, reduce logging verbosity during initialization
             keep_alive: If True, don't terminate server in __del__
         """
-        self.host = host
-        self.port = port
-        self.base_url = f"http://{host}:{port}/api/{LEMONADE_API_VERSION}"
+        # Use provided host/port, or get from env var, or use defaults
+        env_host, env_port = _get_lemonade_config()
+        self.host = host if host is not None else env_host
+        self.port = port if port is not None else env_port
+        self.base_url = f"http://{self.host}:{self.port}/api/{LEMONADE_API_VERSION}"
         self.model = model
         self.server_process = None
         self.log = get_logger(__name__)
@@ -1520,6 +1551,146 @@ class LemonadeClient:
             self.log.error(message)
             raise LemonadeClientError(message)
 
+    def pull_model_stream(
+        self,
+        model_name: str,
+        checkpoint: Optional[str] = None,
+        recipe: Optional[str] = None,
+        reasoning: Optional[bool] = None,
+        vision: Optional[bool] = None,
+        embedding: Optional[bool] = None,
+        reranking: Optional[bool] = None,
+        mmproj: Optional[str] = None,
+        timeout: int = DEFAULT_MODEL_LOAD_TIMEOUT,
+        progress_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Install a model on the server with streaming progress updates.
+
+        This method streams Server-Sent Events (SSE) during the download,
+        providing real-time progress information.
+
+        Args:
+            model_name: Model name to install
+            checkpoint: HuggingFace checkpoint to install (for registering new models)
+            recipe: Lemonade API recipe to load the model with (for registering new models)
+            reasoning: Whether the model is a reasoning model (for registering new models)
+            vision: Whether the model has vision capabilities (for registering new models)
+            embedding: Whether the model is an embedding model (for registering new models)
+            reranking: Whether the model is a reranking model (for registering new models)
+            mmproj: Multimodal Projector file for vision models (for registering new models)
+            timeout: Request timeout in seconds (longer for model installation)
+            progress_callback: Optional callback function called with progress dict on each event.
+                               Signature: callback(event_type: str, data: dict) -> None
+                               event_type is one of: "progress", "complete", "error"
+
+        Yields:
+            Dict containing progress event data with fields:
+            - For "progress" events: file, file_index, total_files, bytes_downloaded,
+              bytes_total, percent
+            - For "complete" events: file_index, total_files, percent (100)
+            - For "error" events: error message
+
+        Raises:
+            LemonadeClientError: If the model installation fails
+
+        Example:
+            # Using as generator
+            for event in client.pull_model_stream("Qwen3-0.6B-GGUF"):
+                if event.get("event") == "progress":
+                    print(f"Downloading: {event['percent']}%")
+
+            # Using with callback
+            def on_progress(event_type, data):
+                if event_type == "progress":
+                    print(f"{data['file']}: {data['percent']}%")
+
+            for _ in client.pull_model_stream("Qwen3-0.6B-GGUF", progress_callback=on_progress):
+                pass
+        """
+        self.log.info(f"Installing {model_name} with streaming progress")
+
+        request_data = {"model_name": model_name, "stream": True}
+
+        if checkpoint:
+            request_data["checkpoint"] = checkpoint
+        if recipe:
+            request_data["recipe"] = recipe
+        if reasoning is not None:
+            request_data["reasoning"] = reasoning
+        if vision is not None:
+            request_data["vision"] = vision
+        if embedding is not None:
+            request_data["embedding"] = embedding
+        if reranking is not None:
+            request_data["reranking"] = reranking
+        if mmproj:
+            request_data["mmproj"] = mmproj
+
+        url = f"{self.base_url}/pull"
+
+        try:
+            response = requests.post(
+                url,
+                json=request_data,
+                headers={"Content-Type": "application/json"},
+                timeout=timeout,
+                stream=True,
+            )
+
+            if response.status_code != 200:
+                error_msg = f"Error pulling model (status {response.status_code}): {response.text}"
+                self.log.error(error_msg)
+                raise LemonadeClientError(error_msg)
+
+            # Parse SSE stream
+            event_type = None
+            received_complete = False
+            try:
+                for line in response.iter_lines(decode_unicode=True):
+                    if not line:
+                        continue
+
+                    if line.startswith("event:"):
+                        event_type = line[6:].strip()
+                    elif line.startswith("data:"):
+                        data_str = line[5:].strip()
+                        try:
+                            data = json.loads(data_str)
+                            data["event"] = event_type or "progress"
+
+                            # Call the progress callback if provided
+                            if progress_callback:
+                                progress_callback(event_type or "progress", data)
+
+                            yield data
+
+                            # Track complete event
+                            if event_type == "complete":
+                                received_complete = True
+
+                            # Check for error event
+                            if event_type == "error":
+                                error_msg = data.get(
+                                    "error", "Unknown error during model pull"
+                                )
+                                raise LemonadeClientError(error_msg)
+
+                        except json.JSONDecodeError:
+                            self.log.warning(f"Failed to parse SSE data: {data_str}")
+                            continue
+            except requests.exceptions.ChunkedEncodingError:
+                # Connection closed by server - this is normal after complete event
+                if not received_complete:
+                    raise
+
+            self.log.info(f"Installed {model_name} successfully via streaming")
+
+        except requests.exceptions.RequestException as e:
+            message = f"Failed to install {model_name}: {e}"
+            self.log.error(message)
+            raise LemonadeClientError(message)
+
     def delete_model(
         self,
         model_name: str,
@@ -2099,6 +2270,140 @@ class LemonadeClient:
             List of agent profile names
         """
         return list(AGENT_PROFILES.keys())
+
+    def get_required_models(self, agent: str = "all") -> List[str]:
+        """
+        Get list of model IDs required for an agent or all agents.
+
+        Args:
+            agent: Agent name or "all" for all unique models
+
+        Returns:
+            List of model IDs (e.g., ["Qwen3-Coder-30B-A3B-Instruct-GGUF", ...])
+        """
+        model_ids = set()
+
+        if agent.lower() == "all":
+            # Collect all unique models across all agents
+            for profile in AGENT_PROFILES.values():
+                for model_key in profile.models:
+                    if model_key in MODELS:
+                        model_ids.add(MODELS[model_key].model_id)
+        else:
+            # Get models for specific agent
+            profile = self.get_agent_profile(agent)
+            if profile:
+                for model_key in profile.models:
+                    if model_key in MODELS:
+                        model_ids.add(MODELS[model_key].model_id)
+
+        return list(model_ids)
+
+    def check_model_available(self, model_id: str) -> bool:
+        """
+        Check if a model is available (downloaded) on the server.
+
+        Args:
+            model_id: Model ID to check
+
+        Returns:
+            True if model is available, False otherwise
+        """
+        try:
+            # Use list_models with show_all=True to get download status
+            models = self.list_models(show_all=True)
+            for model in models.get("data", []):
+                if model.get("id", "").lower() == model_id.lower():
+                    return model.get("downloaded", False)
+        except Exception:
+            pass
+        return False
+
+    def download_agent_models(
+        self,
+        agent: str = "all",
+        timeout: int = DEFAULT_MODEL_LOAD_TIMEOUT,
+        progress_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Download all models required for an agent with streaming progress.
+
+        This method downloads all models needed by an agent (or all agents)
+        and provides real-time progress updates via SSE streaming.
+
+        Args:
+            agent: Agent name (chat, code, rag, etc.) or "all" for all models
+            timeout: Timeout per model in seconds
+            progress_callback: Optional callback for progress updates.
+                               Signature: callback(event_type: str, data: dict) -> None
+
+        Returns:
+            Dict with download results:
+            - success: bool - True if all models downloaded
+            - models: List[Dict] - Status for each model
+            - errors: List[str] - Any error messages
+
+        Example:
+            def on_progress(event_type, data):
+                if event_type == "progress":
+                    print(f"{data['file']}: {data['percent']}%")
+
+            result = client.download_agent_models("chat", progress_callback=on_progress)
+        """
+        model_ids = self.get_required_models(agent)
+
+        if not model_ids:
+            return {
+                "success": True,
+                "models": [],
+                "errors": [],
+                "message": f"No models required for agent '{agent}'",
+            }
+
+        results = {"success": True, "models": [], "errors": []}
+
+        for model_id in model_ids:
+            model_result = {"model_id": model_id, "status": "pending", "skipped": False}
+
+            # Check if already available
+            if self.check_model_available(model_id):
+                model_result["status"] = "already_available"
+                model_result["skipped"] = True
+                results["models"].append(model_result)
+                self.log.info(f"Model {model_id} already available, skipping download")
+                continue
+
+            # Download with streaming
+            try:
+                self.log.info(f"Downloading model: {model_id}")
+                completed = False
+
+                for event in self.pull_model_stream(
+                    model_name=model_id,
+                    timeout=timeout,
+                    progress_callback=progress_callback,
+                ):
+                    if event.get("event") == "complete":
+                        completed = True
+                        model_result["status"] = "completed"
+                    elif event.get("event") == "error":
+                        model_result["status"] = "error"
+                        model_result["error"] = event.get("error", "Unknown error")
+                        results["errors"].append(f"{model_id}: {model_result['error']}")
+                        results["success"] = False
+
+                if not completed and model_result["status"] == "pending":
+                    model_result["status"] = "completed"  # No explicit complete event
+
+            except LemonadeClientError as e:
+                model_result["status"] = "error"
+                model_result["error"] = str(e)
+                results["errors"].append(f"{model_id}: {e}")
+                results["success"] = False
+
+            results["models"].append(model_result)
+
+        return results
 
     def check_model_loaded(self, model_id: str) -> bool:
         """

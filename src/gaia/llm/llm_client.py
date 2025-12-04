@@ -24,8 +24,13 @@ import requests
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from ..version import LEMONADE_VERSION
+
 # Local imports
 from .lemonade_client import DEFAULT_MODEL_NAME
+
+# Default Lemonade server URL (can be overridden via LEMONADE_BASE_URL env var)
+DEFAULT_LEMONADE_URL = "http://localhost:8000/api/v1"
 
 # Type variable for retry decorator
 T = TypeVar("T")
@@ -53,7 +58,7 @@ class LLMClient:
         use_claude: bool = False,
         use_openai: bool = False,
         system_prompt: Optional[str] = None,
-        base_url: Optional[str] = "http://localhost:8000/api/v1",
+        base_url: Optional[str] = None,
         claude_model: str = "claude-sonnet-4-20250514",
         max_retries: int = 3,
         retry_base_delay: float = 1.0,
@@ -65,7 +70,7 @@ class LLMClient:
             use_claude: If True, uses Anthropic Claude API.
             use_openai: If True, uses OpenAI ChatGPT API.
             system_prompt: Default system prompt to use for all generation requests.
-            base_url: Base URL for local LLM server.
+            base_url: Base URL for local LLM server (defaults to LEMONADE_BASE_URL env var).
             claude_model: Claude model to use (e.g., "claude-sonnet-4-20250514").
             max_retries: Maximum number of retry attempts on connection errors.
             retry_base_delay: Base delay in seconds for exponential backoff.
@@ -73,6 +78,9 @@ class LLMClient:
         Note: Uses local LLM server by default unless use_claude or use_openai is True.
               Context size is configured when starting the Lemonade server with --ctx-size parameter.
         """
+        # Use provided base_url, fall back to env var, then default
+        if base_url is None:
+            base_url = os.getenv("LEMONADE_BASE_URL", DEFAULT_LEMONADE_URL)
         # Compute use_local: True if neither claude nor openai is selected
         use_local = not (use_claude or use_openai)
 
@@ -342,12 +350,12 @@ class LLMClient:
                     ):
                         raise ConnectionError(
                             f"API endpoint error: {error_str}\n\n"
-                            "This may indicate:\n"
-                            "  1. Lemonade Server version mismatch (try updating to 9.0.4)\n"
-                            "  2. Model not properly loaded or corrupted\n\n"
-                            "To fix model issues, try:\n"
-                            "  lemonade model remove <model-name>\n"
-                            "  lemonade model download <model-name>\n"
+                            f"This may indicate:\n"
+                            f"  1. Lemonade Server version mismatch (try updating to {LEMONADE_VERSION})\n"
+                            f"  2. Model not properly loaded or corrupted\n\n"
+                            f"To fix model issues, try:\n"
+                            f"  lemonade model remove <model-name>\n"
+                            f"  lemonade model download <model-name>\n"
                         ) from e
 
                 if "network" in error_str.lower() or "connection" in error_str.lower():
@@ -426,12 +434,12 @@ class LLMClient:
                     ):
                         raise ConnectionError(
                             f"API endpoint error: {error_str}\n\n"
-                            "This may indicate:\n"
-                            "  1. Lemonade Server version mismatch (try updating to 9.0.4)\n"
-                            "  2. Model not properly loaded or corrupted\n\n"
-                            "To fix model issues, try:\n"
-                            "  lemonade model remove <model-name>\n"
-                            "  lemonade model download <model-name>\n"
+                            f"This may indicate:\n"
+                            f"  1. Lemonade Server version mismatch (try updating to {LEMONADE_VERSION})\n"
+                            f"  2. Model not properly loaded or corrupted\n\n"
+                            f"To fix model issues, try:\n"
+                            f"  lemonade model remove <model-name>\n"
+                            f"  lemonade model download <model-name>\n"
                         ) from e
 
                 if "network" in error_str.lower() or "connection" in error_str.lower():

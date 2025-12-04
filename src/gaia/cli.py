@@ -9,6 +9,18 @@ import sys
 import time
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+from gaia.llm.lemonade_client import (
+    DEFAULT_HOST,
+    DEFAULT_LEMONADE_URL,
+    DEFAULT_MODEL_NAME,
+    DEFAULT_PORT,
+    LemonadeClient,
+    LemonadeClientError,
+    _get_lemonade_config,
+)
+from gaia.llm.llm_client import LLMClient
 from gaia.logger import get_logger
 from gaia.version import version
 
@@ -30,14 +42,9 @@ try:
 except ImportError:
     CodeAgent = None
     CODE_AVAILABLE = False
-from gaia.llm.lemonade_client import (
-    DEFAULT_HOST,
-    DEFAULT_MODEL_NAME,
-    DEFAULT_PORT,
-    LemonadeClient,
-    LemonadeClientError,
-)
-from gaia.llm.llm_client import LLMClient
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Set debug level for the logger
 logging.getLogger("gaia").setLevel(logging.INFO)
@@ -55,9 +62,33 @@ DEFAULT_EXPERIMENTS_DIR = "output/experiments"
 DEFAULT_EVALUATIONS_DIR = "output/evaluations"
 
 
-def check_lemonade_health(host="localhost", port=8000):
+# Helper functions for download progress display
+def _format_bytes(b: int) -> str:
+    """Format bytes to human readable string."""
+    if b >= 1024 * 1024 * 1024:
+        return f"{b / (1024 * 1024 * 1024):.1f} GB"
+    elif b >= 1024 * 1024:
+        return f"{b / (1024 * 1024):.1f} MB"
+    elif b >= 1024:
+        return f"{b / 1024:.1f} KB"
+    return f"{b} B"
+
+
+def _make_progress_bar(percent: int, width: int = 20) -> str:
+    """Create a progress bar string."""
+    filled = int(width * percent / 100)
+    empty = width - filled
+    return f"[{'█' * filled}{'░' * empty}]"
+
+
+def check_lemonade_health(host=None, port=None):
     """Check if Lemonade server is running and healthy using LemonadeClient."""
     log = get_logger(__name__)
+
+    # Use provided host/port, or get from env var, or use defaults
+    env_host, env_port = _get_lemonade_config()
+    host = host if host is not None else env_host
+    port = port if port is not None else env_port
 
     try:
         # Create a LemonadeClient instance for health checking
@@ -111,8 +142,9 @@ def print_lemonade_error(for_code_agent=False):
             file=sys.stderr,
         )
         print("", file=sys.stderr)
+    base_url = os.getenv("LEMONADE_BASE_URL", f"{DEFAULT_LEMONADE_URL}/api/v1")
     print(
-        "The server should be accessible at http://localhost:8000/api/v1/health",
+        f"The server should be accessible at {base_url}/health",
         file=sys.stderr,
     )
     print("Then try your command again.", file=sys.stderr)
@@ -125,8 +157,8 @@ def initialize_lemonade_for_agent(
     skip_if_external: bool = False,
     use_claude: bool = False,
     use_chatgpt: bool = False,
-    host: str = DEFAULT_HOST,
-    port: int = DEFAULT_PORT,
+    host: str = None,
+    port: int = None,
 ):
     """
     Initialize Lemonade Server for a specific GAIA agent.
@@ -142,11 +174,14 @@ def initialize_lemonade_for_agent(
         skip_if_external: If True, skip initialization when using Claude/ChatGPT
         use_claude: Whether Claude API is being used
         use_chatgpt: Whether ChatGPT API is being used
-        host: Host address of the Lemonade server
-        port: Port number of the Lemonade server
+        host: Host address of the Lemonade server (defaults to LEMONADE_BASE_URL env var)
+        port: Port number of the Lemonade server (defaults to LEMONADE_BASE_URL env var)
 
     Returns:
         Tuple of (success: bool, base_url: str, version: str)
+
+    Note:
+        Host and port can be configured via LEMONADE_BASE_URL environment variable.
 
     Example:
         success, base_url, version = initialize_lemonade_for_agent("chat")
@@ -154,6 +189,11 @@ def initialize_lemonade_for_agent(
             sys.exit(1)
     """
     log = get_logger(__name__)
+
+    # Use provided host/port, or get from env var, or use defaults
+    env_host, env_port = _get_lemonade_config()
+    host = host if host is not None else env_host
+    port = port if port is not None else env_port
 
     # Skip initialization if using external API
     if skip_if_external and (use_claude or use_chatgpt):
@@ -187,6 +227,141 @@ def initialize_lemonade_for_agent(
         if not quiet:
             print(f"❌ Lemonade initialization failed: {e}", file=sys.stderr)
         return False, None, None
+
+
+def ensure_agent_models(
+    agent: str,
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    quiet: bool = False,
+    timeout: int = 1800,
+) -> bool:
+    """
+    Ensure all models required for an agent are downloaded.
+
+    This function checks if models are available and downloads them with
+    streaming progress if needed. Called before starting agents to provide
+    user feedback during model downloads.
+
+    Args:
+        agent: Agent name (chat, code, rag, talk, blender, jira, docker, vlm, minimal, mcp)
+        host: Lemonade server host
+        port: Lemonade server port
+        quiet: Suppress output (only errors)
+        timeout: Timeout per model in seconds
+
+    Returns:
+        bool: True if all models are available, False on error
+    """
+    log = get_logger(__name__)
+
+    try:
+        client = LemonadeClient(host=host, port=port, verbose=False)
+
+        # Get required models for this agent
+        model_ids = client.get_required_models(agent)
+
+        if not model_ids:
+            return True
+
+        # Check which models need downloading
+        models_to_download = []
+        for model_id in model_ids:
+            if not client.check_model_available(model_id):
+                models_to_download.append(model_id)
+
+        if not models_to_download:
+            log.debug(f"All models for {agent} agent already available")
+            return True
+
+        if not quiet:
+            print(
+                f"📥 Downloading {len(models_to_download)} model(s) for {agent} agent..."
+            )
+            print()
+
+        # Progress tracking
+        last_percent = [-1]
+        last_file_index = [0]
+
+        def progress_callback(event_type: str, data: dict) -> None:
+            """Display download progress in CLI."""
+            if quiet:
+                return
+
+            if event_type == "progress":
+                percent = data.get("percent", 0)
+                file_name = data.get("file", "unknown")
+                file_index = data.get("file_index", 1)
+                total_files = data.get("total_files", 1)
+
+                # Print newline when moving to a new file
+                if file_index != last_file_index[0] and last_file_index[0] > 0:
+                    print()  # Newline for previous file
+                last_file_index[0] = file_index
+
+                # Update every 2% for smooth progress
+                if percent >= last_percent[0] + 2 or percent == 0 or percent == 100:
+                    bytes_downloaded = data.get("bytes_downloaded", 0)
+                    bytes_total = data.get("bytes_total", 0)
+
+                    # Create progress bar
+                    bar = _make_progress_bar(percent)
+                    progress_line = (
+                        f"   {bar} {percent:3d}% "
+                        f"[{file_index}/{total_files}] {file_name}: "
+                        f"{_format_bytes(bytes_downloaded)}/{_format_bytes(bytes_total)}"
+                    )
+                    print(f"\r{progress_line:<100}", end="", flush=True)
+                    last_percent[0] = percent
+
+            elif event_type == "complete":
+                print()  # Newline after progress
+                print("   ✅ Download complete")
+                last_percent[0] = -1
+                last_file_index[0] = 0
+
+            elif event_type == "error":
+                print()  # Newline after progress
+                error_msg = data.get("error", "Unknown error")
+                print(f"   ❌ Error: {error_msg}")
+
+        # Download each model
+        for model_id in models_to_download:
+            last_percent[0] = -1
+
+            if not quiet:
+                print(f"📥 {model_id}")
+
+            try:
+                for event in client.pull_model_stream(
+                    model_name=model_id,
+                    timeout=timeout,
+                    progress_callback=progress_callback,
+                ):
+                    if event.get("event") == "error":
+                        log.error(f"Failed to download {model_id}")
+                        return False
+            except LemonadeClientError as e:
+                log.error(f"Failed to download {model_id}: {e}")
+                if not quiet:
+                    print(f"   ❌ Failed: {e}")
+                return False
+
+            if not quiet:
+                print()
+
+        if not quiet:
+            print(f"✅ All models ready for {agent} agent")
+            print()
+
+        return True
+
+    except Exception as e:
+        log.error(f"Failed to ensure models for {agent}: {e}")
+        if not quiet:
+            print(f"❌ Error checking/downloading models: {e}", file=sys.stderr)
+        return False
 
 
 def check_mcp_health(host="localhost", port=9876):
@@ -373,12 +548,15 @@ async def async_main(action, **kwargs):
     lemonade_base_url = kwargs.get("base_url")  # May be None if not specified
     if action in action_to_agent:
         agent_profile = action_to_agent[action]
+        use_claude = kwargs.get("use_claude", False)
+        use_chatgpt = kwargs.get("use_chatgpt", False)
+
         success, detected_base_url, _server_version = initialize_lemonade_for_agent(
             agent=agent_profile,
             auto_start=True,
             skip_if_external=True,
-            use_claude=kwargs.get("use_claude", False),
-            use_chatgpt=kwargs.get("use_chatgpt", False),
+            use_claude=use_claude,
+            use_chatgpt=use_chatgpt,
         )
         if not success:
             sys.exit(1)
@@ -432,7 +610,10 @@ async def async_main(action, **kwargs):
                 use_claude=kwargs.get("use_claude", False),
                 use_chatgpt=kwargs.get("use_chatgpt", False),
                 claude_model=kwargs.get("claude_model", "claude-sonnet-4-20250514"),
-                base_url=kwargs.get("base_url", "http://localhost:8000/api/v1"),
+                base_url=kwargs.get(
+                    "base_url",
+                    os.getenv("LEMONADE_BASE_URL", f"{DEFAULT_LEMONADE_URL}/api/v1"),
+                ),
                 model_id=kwargs.get("model", None),
                 max_steps=kwargs.get("max_steps", 100),
                 streaming=kwargs.get("stream", False),
@@ -589,7 +770,7 @@ def main():
     parent_parser.add_argument(
         "--base-url",
         default=None,
-        help="Lemonade LLM server base URL (default: from LEMONADE_BASE_URL env or http://localhost:8000/api/v1)",
+        help=f"Lemonade LLM server base URL (default: from LEMONADE_BASE_URL env or {DEFAULT_LEMONADE_URL}/api/v1)",
     )
     parent_parser.add_argument(
         "--model",
@@ -623,6 +804,11 @@ def main():
         "--stream",
         action="store_true",
         help="Enable real-time streaming of LLM responses (shows raw JSON)",
+    )
+    parent_parser.add_argument(
+        "--no-lemonade-check",
+        action="store_true",
+        help="Skip Lemonade server check (for CI/testing without Lemonade)",
     )
 
     # Create subparsers for different commands
@@ -1017,6 +1203,144 @@ def main():
         help="Enable step-through debugging mode (pause at each agent step)",
     )
     api_parser.set_defaults(action="api")
+
+    # Add model pull command
+    pull_parser = subparsers.add_parser(
+        "pull",
+        help="Download/install a model from the Lemonade Server registry",
+        parents=[parent_parser],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Pull a registered model
+  gaia pull Qwen3-0.6B-GGUF
+
+  # Pull and register a custom model from HuggingFace
+  gaia pull user.Custom-Model-GGUF --checkpoint unsloth/Custom-Model-GGUF:Q4_K_M --recipe llamacpp
+
+  # Pull a reasoning model
+  gaia pull user.DeepSeek-GGUF --checkpoint unsloth/DeepSeek-R1-GGUF --recipe llamacpp --reasoning
+
+  # Pull a vision model with mmproj
+  gaia pull user.Vision-Model --checkpoint model/vision:Q4 --recipe llamacpp --vision --mmproj mmproj.gguf
+        """,
+    )
+    pull_parser.add_argument(
+        "model_name",
+        help="Name of the model to pull (use 'user.' prefix for custom models)",
+    )
+    pull_parser.add_argument(
+        "--checkpoint",
+        help="HuggingFace checkpoint for custom models (e.g., unsloth/Model-GGUF:Q4_K_M)",
+    )
+    pull_parser.add_argument(
+        "--recipe",
+        help="Lemonade recipe for custom models (e.g., llamacpp, oga-cpu)",
+    )
+    pull_parser.add_argument(
+        "--reasoning",
+        action="store_true",
+        help="Mark model as a reasoning model (like DeepSeek)",
+    )
+    pull_parser.add_argument(
+        "--vision",
+        action="store_true",
+        help="Mark model as having vision capabilities",
+    )
+    pull_parser.add_argument(
+        "--embedding",
+        action="store_true",
+        help="Mark model as an embedding model",
+    )
+    pull_parser.add_argument(
+        "--reranking",
+        action="store_true",
+        help="Mark model as a reranking model",
+    )
+    pull_parser.add_argument(
+        "--mmproj",
+        help="Multimodal projector file for vision models",
+    )
+    pull_parser.add_argument(
+        "--timeout",
+        type=int,
+        default=1200,
+        help="Timeout in seconds for model download (default: 1200)",
+    )
+    pull_parser.add_argument(
+        "--host",
+        default="localhost",
+        help="Lemonade server host (default: localhost)",
+    )
+    pull_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Lemonade server port (default: 8000)",
+    )
+    pull_parser.set_defaults(action="pull")
+
+    # Add model download command
+    download_parser = subparsers.add_parser(
+        "download",
+        help="Download all models required for GAIA agents",
+        parents=[parent_parser],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Download all models for all agents
+  gaia download
+
+  # Download models for chat agent only
+  gaia download --agent chat
+
+  # Download models for code agent
+  gaia download --agent code
+
+  # List available agents and their required models
+  gaia download --list
+
+  # Delete all downloaded GAIA models (free up disk space)
+  gaia download --clear-cache
+
+Available agents: chat, code, talk, rag, blender, jira, docker, vlm, minimal, mcp
+        """,
+    )
+    download_parser.add_argument(
+        "--agent",
+        default="all",
+        help="Agent to download models for (default: all)",
+    )
+    download_parser.add_argument(
+        "--list",
+        action="store_true",
+        dest="list_models",
+        help="List required models without downloading",
+    )
+    download_parser.add_argument(
+        "--clear-cache",
+        action="store_true",
+        dest="clear_cache",
+        help="Delete all downloaded GAIA models to free up disk space",
+    )
+    download_parser.add_argument(
+        "--timeout",
+        type=int,
+        default=1800,
+        help="Timeout per model in seconds (default: 1800)",
+    )
+    download_parser.add_argument(
+        "--host",
+        default="localhost",
+        help="Lemonade server host (default: localhost)",
+    )
+    download_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Lemonade server port (default: 8000)",
+    )
+    download_parser.set_defaults(action="download")
 
     subparsers.add_parser(
         "stats",
@@ -1653,7 +1977,7 @@ Examples:
 
     # MCP start command
     mcp_start_parser = mcp_subparsers.add_parser(
-        "start", help="Start the MCP bridge server"
+        "start", help="Start the MCP bridge server", parents=[parent_parser]
     )
     mcp_start_parser.add_argument(
         "--host",
@@ -1663,11 +1987,7 @@ Examples:
     mcp_start_parser.add_argument(
         "--port", type=int, default=8765, help="Port to listen on (default: 8765)"
     )
-    mcp_start_parser.add_argument(
-        "--base-url",
-        default="http://localhost:8000/api/v1",
-        help="LLM server URL (default: http://localhost:8000/api/v1)",
-    )
+    # Note: --base-url is inherited from parent_parser
     mcp_start_parser.add_argument(
         "--auth-token", help="Optional authentication token for secure connections"
     )
@@ -1686,11 +2006,6 @@ Examples:
         "--verbose",
         action="store_true",
         help="Enable verbose logging for all HTTP requests",
-    )
-    mcp_start_parser.add_argument(
-        "--no-lemonade-check",
-        action="store_true",
-        help="Skip Lemonade Server health check (not recommended)",
     )
     mcp_start_parser.add_argument(
         "--ctx-size",
@@ -2459,14 +2774,347 @@ Let me know your answer!
             print(f"❌ {result['message']}")
         return
 
+    # Handle model pull command
+    if args.action == "pull":
+        log.info(f"Pulling model: {args.model_name}")
+        verbose = getattr(args, "verbose", False)
+        try:
+            client = LemonadeClient(host=args.host, port=args.port, verbose=verbose)
+
+            # Check if Lemonade server is running
+            if not check_lemonade_health(args.host, args.port):
+                print_lemonade_error()
+                return
+
+            print(f"📥 Pulling model: {args.model_name}")
+
+            # Define a CLI progress callback for real-time updates
+            last_percent = [-1]  # Use list to allow mutation in closure
+            last_file_index = [0]
+
+            def cli_progress_callback(event_type: str, data: dict) -> None:
+                """Display download progress in CLI."""
+                if event_type == "progress":
+                    percent = data.get("percent", 0)
+                    file_name = data.get("file", "unknown")
+                    file_index = data.get("file_index", 1)
+                    total_files = data.get("total_files", 1)
+
+                    # Print newline when moving to a new file
+                    if file_index != last_file_index[0] and last_file_index[0] > 0:
+                        print()  # Newline for previous file
+                    last_file_index[0] = file_index
+
+                    # Update every 2% for smooth progress
+                    if percent >= last_percent[0] + 2 or percent == 0 or percent == 100:
+                        bytes_downloaded = data.get("bytes_downloaded", 0)
+                        bytes_total = data.get("bytes_total", 0)
+
+                        # Create progress bar
+                        bar = _make_progress_bar(percent)
+                        progress_line = (
+                            f"   {bar} {percent:3d}% "
+                            f"[{file_index}/{total_files}] {file_name}: "
+                            f"{_format_bytes(bytes_downloaded)}/{_format_bytes(bytes_total)}"
+                        )
+                        print(f"\r{progress_line:<100}", end="", flush=True)
+                        last_percent[0] = percent
+
+                elif event_type == "complete":
+                    print()  # Newline after progress
+                    print(f"✅ Model downloaded successfully: {args.model_name}")
+
+                elif event_type == "error":
+                    print()  # Newline after progress
+                    error_msg = data.get("error", "Unknown error")
+                    print(f"❌ Download failed: {error_msg}")
+
+            # Use streaming pull with progress callback
+            completed = False
+            for event in client.pull_model_stream(
+                model_name=args.model_name,
+                checkpoint=getattr(args, "checkpoint", None),
+                recipe=getattr(args, "recipe", None),
+                reasoning=getattr(args, "reasoning", False) or None,
+                vision=getattr(args, "vision", False) or None,
+                embedding=getattr(args, "embedding", False) or None,
+                reranking=getattr(args, "reranking", False) or None,
+                mmproj=getattr(args, "mmproj", None),
+                timeout=args.timeout,
+                progress_callback=cli_progress_callback,
+            ):
+                if event.get("event") == "complete":
+                    completed = True
+                elif event.get("event") == "error":
+                    sys.exit(1)
+
+            if not completed:
+                print("⚠️  Model pull completed without explicit complete event")
+
+        except LemonadeClientError as e:
+            print(f"❌ Error pulling model: {e}")
+            sys.exit(1)
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "connection" in error_msg or "refused" in error_msg:
+                print_lemonade_error()
+            else:
+                print(f"❌ Error: {e}")
+            sys.exit(1)
+        return
+
+    # Handle model download command
+    if args.action == "download":
+        from gaia.llm.lemonade_client import AGENT_PROFILES, MODELS
+
+        log.info(f"Download models command - agent: {args.agent}")
+        verbose = getattr(args, "verbose", False)
+        try:
+            client = LemonadeClient(host=args.host, port=args.port, verbose=verbose)
+
+            # Clear cache mode: delete all GAIA models (including partial downloads)
+            if args.clear_cache:
+                # Check if Lemonade server is running
+                if not check_lemonade_health(args.host, args.port):
+                    print_lemonade_error()
+                    return
+
+                model_ids = client.get_required_models("all")
+                if not model_ids:
+                    print("📦 No GAIA models defined")
+                    return
+
+                print(f"🗑️  Clearing cache for {len(model_ids)} GAIA model(s)...")
+                print("   (This removes both complete and partial downloads)")
+                print()
+
+                success_count = 0
+                skip_count = 0
+                fail_count = 0
+
+                in_use_models = []
+                for model_id in model_ids:
+                    print(f"   Deleting {model_id}...", end=" ", flush=True)
+                    try:
+                        client.delete_model(model_id)
+                        print("✅")
+                        success_count += 1
+                    except LemonadeClientError as e:
+                        error_str = str(e).lower()
+                        # Model not found is OK - means it wasn't downloaded
+                        if "not found" in error_str or "does not exist" in error_str:
+                            print("⏭️  (not downloaded)")
+                            skip_count += 1
+                        elif "being used by another process" in error_str:
+                            print("🔒 (model is loaded)")
+                            in_use_models.append(model_id)
+                            fail_count += 1
+                        else:
+                            print(f"❌ {e}")
+                            fail_count += 1
+
+                print()
+                print("=" * 50)
+                print("🗑️  Cache Clear Summary:")
+                print(f"   ✅ Deleted: {success_count}")
+                print(f"   ⏭️  Skipped (not downloaded): {skip_count}")
+                if fail_count > 0:
+                    print(f"   ❌ Failed: {fail_count}")
+                print("=" * 50)
+
+                # Show helpful tips if models are in use
+                if in_use_models:
+                    print()
+                    print(
+                        "💡 Some models could not be deleted because they are currently loaded."
+                    )
+                    print("   To delete them, restart Lemonade Server and try again:")
+                    print()
+                    print(
+                        "   1. Close any running GAIA commands (gaia chat, gaia code, etc.)"
+                    )
+                    print(
+                        "   2. Restart Lemonade Server (close window and run: lemonade-server serve)"
+                    )
+                    print("   3. Run: gaia download --clear-cache")
+                    print()
+                    print("   Or manually delete the model cache folders:")
+                    print("   - Lemonade cache: %LOCALAPPDATA%\\lemonade\\")
+                    print(
+                        "   - HuggingFace cache: %USERPROFILE%\\.cache\\huggingface\\hub\\"
+                    )
+
+                return
+
+            # List mode: show required models without downloading
+            if args.list_models:
+                agent_name = args.agent.lower()
+                if agent_name == "all":
+                    print("📦 Models required for all GAIA agents:\n")
+                    all_models = set()
+                    for profile in AGENT_PROFILES.values():
+                        print(f"  {profile.display_name} ({profile.name}):")
+                        for model_key in profile.models:
+                            if model_key in MODELS:
+                                model = MODELS[model_key]
+                                all_models.add(model.model_id)
+                                # Check if available
+                                available = client.check_model_available(model.model_id)
+                                status = "✅" if available else "⬜"
+                                print(f"    {status} {model.model_id}")
+                        print()
+                    print(f"  Total unique models: {len(all_models)}")
+                else:
+                    profile = client.get_agent_profile(agent_name)
+                    if not profile:
+                        print(f"❌ Unknown agent: {agent_name}")
+                        print(f"   Available: {', '.join(client.list_agents())}")
+                        sys.exit(1)
+                    print(f"📦 Models required for {profile.display_name}:\n")
+                    for model_key in profile.models:
+                        if model_key in MODELS:
+                            model = MODELS[model_key]
+                            available = client.check_model_available(model.model_id)
+                            status = "✅" if available else "⬜"
+                            print(f"  {status} {model.model_id}")
+                return
+
+            # Check if Lemonade server is running
+            if not check_lemonade_health(args.host, args.port):
+                print_lemonade_error()
+                return
+
+            agent_name = args.agent.lower()
+            model_ids = client.get_required_models(agent_name)
+
+            if not model_ids:
+                if agent_name != "all":
+                    profile = client.get_agent_profile(agent_name)
+                    if not profile:
+                        print(f"❌ Unknown agent: {agent_name}")
+                        print(f"   Available: {', '.join(client.list_agents())}")
+                        sys.exit(1)
+                print(f"📦 No models to download for '{agent_name}'")
+                return
+
+            print(f"📥 Downloading {len(model_ids)} model(s) for '{agent_name}'...")
+            print()
+
+            # Track progress per model
+            current_model = [None]
+            last_percent = [-1]
+            last_file_index = [0]
+
+            def download_progress_callback(event_type: str, data: dict) -> None:
+                """Display download progress in CLI."""
+                if event_type == "progress":
+                    percent = data.get("percent", 0)
+                    file_name = data.get("file", "unknown")
+                    file_index = data.get("file_index", 1)
+                    total_files = data.get("total_files", 1)
+
+                    # Print newline when moving to a new file
+                    if file_index != last_file_index[0] and last_file_index[0] > 0:
+                        print()  # Newline for previous file
+                    last_file_index[0] = file_index
+
+                    # Update every 2% for smooth progress
+                    if percent >= last_percent[0] + 2 or percent == 0 or percent == 100:
+                        bytes_downloaded = data.get("bytes_downloaded", 0)
+                        bytes_total = data.get("bytes_total", 0)
+
+                        # Create progress bar
+                        bar = _make_progress_bar(percent)
+                        progress_line = (
+                            f"   {bar} {percent:3d}% "
+                            f"[{file_index}/{total_files}] {file_name}: "
+                            f"{_format_bytes(bytes_downloaded)}/{_format_bytes(bytes_total)}"
+                        )
+                        print(f"\r{progress_line:<100}", end="", flush=True)
+                        last_percent[0] = percent
+
+                elif event_type == "complete":
+                    print()  # Newline after progress
+                    print("   ✅ Download complete")
+                    last_percent[0] = -1  # Reset for next model
+                    last_file_index[0] = 0
+
+                elif event_type == "error":
+                    print()  # Newline after progress
+                    error_msg = data.get("error", "Unknown error")
+                    print(f"   ❌ Error: {error_msg}")
+
+            # Download each model
+            success_count = 0
+            skip_count = 0
+            fail_count = 0
+
+            for model_id in model_ids:
+                current_model[0] = model_id
+                last_percent[0] = -1
+
+                # Check if already available
+                if client.check_model_available(model_id):
+                    print(f"✅ {model_id} (already downloaded)")
+                    skip_count += 1
+                    continue
+
+                print(f"📥 {model_id}")
+
+                try:
+                    completed = False
+                    for event in client.pull_model_stream(
+                        model_name=model_id,
+                        timeout=args.timeout,
+                        progress_callback=download_progress_callback,
+                    ):
+                        if event.get("event") == "complete":
+                            completed = True
+                        elif event.get("event") == "error":
+                            fail_count += 1
+                            break
+
+                    if completed:
+                        success_count += 1
+                except LemonadeClientError as e:
+                    print(f"   ❌ Failed: {e}")
+                    fail_count += 1
+
+                print()
+
+            # Summary
+            print("=" * 50)
+            print("📊 Download Summary:")
+            print(f"   ✅ Downloaded: {success_count}")
+            print(f"   ⏭️  Skipped (already available): {skip_count}")
+            if fail_count > 0:
+                print(f"   ❌ Failed: {fail_count}")
+            print("=" * 50)
+
+            if fail_count > 0:
+                sys.exit(1)
+
+        except LemonadeClientError as e:
+            print(f"❌ Error: {e}")
+            sys.exit(1)
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "connection" in error_msg or "refused" in error_msg:
+                print_lemonade_error()
+            else:
+                print(f"❌ Error: {e}")
+            sys.exit(1)
+        return
+
     # Handle LLM command
     if args.action == "llm":
         # Initialize Lemonade with minimal profile for direct LLM queries
-        if not initialize_lemonade_for_agent(
+        success, _, _ = initialize_lemonade_for_agent(
             agent="minimal",
             auto_start=False,
             quiet=False,
-        ):
+        )
+        if not success:
             return
 
         try:
@@ -3587,19 +4235,20 @@ def handle_code_command(args):
     # Get base_url from args or environment
     base_url = getattr(args, "base_url", None)
     if base_url is None:
-        base_url = os.getenv("LEMONADE_BASE_URL", "http://localhost:8000/api/v1")
+        base_url = os.getenv("LEMONADE_BASE_URL", f"{DEFAULT_LEMONADE_URL}/api/v1")
 
     # Initialize Lemonade with code agent profile (32768 context)
     # Skip for remote servers (e.g., devtunnel URLs) or external APIs
     is_local = "localhost" in base_url or "127.0.0.1" in base_url
     if is_local:
-        if not initialize_lemonade_for_agent(
+        success, _, _ = initialize_lemonade_for_agent(
             agent="code",
             auto_start=True,
             skip_if_external=True,
             use_claude=getattr(args, "use_claude", False),
             use_chatgpt=getattr(args, "use_chatgpt", False),
-        ):
+        )
+        if not success:
             sys.exit(1)
 
     try:
@@ -3786,13 +4435,14 @@ def handle_jira_command(args):
     log = get_logger(__name__)
 
     # Initialize Lemonade with jira agent profile (32768 context)
-    if not initialize_lemonade_for_agent(
+    success, _, _ = initialize_lemonade_for_agent(
         agent="jira",
         auto_start=True,
         skip_if_external=True,
         use_claude=getattr(args, "use_claude", False),
         use_chatgpt=getattr(args, "use_chatgpt", False),
-    ):
+    )
+    if not success:
         sys.exit(1)
 
     try:
@@ -3833,13 +4483,14 @@ def handle_docker_command(args):
     log = get_logger(__name__)
 
     # Initialize Lemonade with docker agent profile (32768 context)
-    if not initialize_lemonade_for_agent(
+    success, _, _ = initialize_lemonade_for_agent(
         agent="docker",
         auto_start=True,
         skip_if_external=True,
         use_claude=getattr(args, "use_claude", False),
         use_chatgpt=getattr(args, "use_chatgpt", False),
-    ):
+    )
+    if not success:
         sys.exit(1)
 
     try:
@@ -3882,13 +4533,15 @@ def handle_api_command(args):
     log = get_logger(__name__)
 
     if args.subcommand == "start":
-        # Initialize Lemonade with mcp profile (API server needs LLM backend)
-        if not initialize_lemonade_for_agent(
-            agent="mcp",
-            auto_start=False,
-            quiet=False,
-        ):
-            return
+        # Initialize Lemonade with mcp profile (unless --no-lemonade-check)
+        if not getattr(args, "no_lemonade_check", False):
+            success, _, _ = initialize_lemonade_for_agent(
+                agent="mcp",
+                auto_start=False,
+                quiet=False,
+            )
+            if not success:
+                return
 
         try:
             import uvicorn
@@ -4188,13 +4841,14 @@ def handle_blender_command(args):
 
     # Initialize Lemonade with blender agent profile (32768 context)
     log.info("Initializing Lemonade for Blender agent...")
-    if not initialize_lemonade_for_agent(
+    success, _, _ = initialize_lemonade_for_agent(
         agent="blender",
         auto_start=True,
         skip_if_external=True,
         use_claude=getattr(args, "use_claude", False),
         use_chatgpt=getattr(args, "use_chatgpt", False),
-    ):
+    )
+    if not success:
         sys.exit(1)
 
     # Check if Blender MCP server is running
@@ -4299,11 +4953,12 @@ def handle_mcp_start(args):
 
         # Initialize Lemonade with mcp agent profile (unless --no-lemonade-check)
         if not getattr(args, "no_lemonade_check", False):
-            if not initialize_lemonade_for_agent(
+            success, _, _ = initialize_lemonade_for_agent(
                 agent="mcp",
                 auto_start=False,  # MCP doesn't auto-start, just check
                 quiet=False,
-            ):
+            )
+            if not success:
                 return
             print("")  # Add blank line before MCP output
 
@@ -4338,23 +4993,39 @@ def handle_mcp_start(args):
                 args.host,
                 "--port",
                 str(args.port),
-                "--base-url",
-                args.base_url,
             ]
 
             # Add optional arguments if provided
+            if args.base_url:
+                cmd_args.extend(["--base-url", args.base_url])
             if args.auth_token:
                 cmd_args.extend(["--auth-token", args.auth_token])
             if args.no_streaming:
                 cmd_args.append("--no-streaming")
             if getattr(args, "verbose", False):
                 cmd_args.append("--verbose")
+            if getattr(args, "no_lemonade_check", False):
+                cmd_args.append("--no-lemonade-check")
 
             print("🚀 Starting GAIA MCP Bridge in background")
             print(f"📍 Host: {args.host}:{args.port}")
             print(f"📄 Log file: {log_file_path}")
 
-            # Open log file for appending
+            # Write initial banner BEFORE starting subprocess (prevents truncation issues)
+            import datetime
+
+            ts = datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+            with open(log_file_path, "w", encoding="utf-8") as init_log:
+                init_log.write(
+                    f"{ts} | INFO | GAIA MCP Bridge started in background mode\n"
+                )
+                init_log.write(f"{ts} | INFO | Host: {args.host}:{args.port}\n")
+                init_log.write(f"{ts} | INFO | Base URL: {args.base_url}\n")
+                streaming = "disabled" if args.no_streaming else "enabled"
+                init_log.write(f"{ts} | INFO | Streaming: {streaming}\n")
+                init_log.write(f"{ts} | INFO | " + "=" * 60 + "\n")
+
+            # Open for append - subprocess will add its output after banner
             log_handle = open(log_file_path, "a", encoding="utf-8")
 
             # Start the process
@@ -4386,22 +5057,10 @@ def handle_mcp_start(args):
             with open(pid_file_path, "w", encoding="utf-8") as pid_file:
                 pid_file.write(str(process.pid))
 
-            # Write PID info to log file
-            with open(log_file_path, "w", encoding="utf-8") as log_file:
-                import datetime
-
-                timestamp = datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
-                log_file.write(
-                    f"{timestamp} | INFO | GAIA MCP Bridge started in background mode\n"
-                )
-                log_file.write(f"{timestamp} | INFO | Process ID: {process.pid}\n")
-                log_file.write(f"{timestamp} | INFO | Host: {args.host}:{args.port}\n")
-                log_file.write(f"{timestamp} | INFO | Base URL: {args.base_url}\n")
-                log_file.write(
-                    f"{timestamp} | INFO | Streaming: {'disabled' if args.no_streaming else 'enabled'}\n"
-                )
-                log_file.write(f"{timestamp} | INFO | {'='*60}\n")
-                log_file.flush()
+            # Append PID to log (banner was written before subprocess started)
+            ts = datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+            log_handle.write(f"{ts} | INFO | Process ID: {process.pid}\n")
+            log_handle.flush()
 
             print("✅ MCP bridge started in background")
             print(f"📍 Listening on: {args.host}:{args.port}")

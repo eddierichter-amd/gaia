@@ -134,6 +134,8 @@ gaia --help
 - **`blender`**: Create and modify 3D scenes using the Blender agent (see [Blender Guide](./blender.md))
 - **`api`**: Start and manage the GAIA API Server for VSCode and OpenAI-compatible integrations (see [API Server Guide](./api.md))
 - **`mcp`**: Start and manage MCP (Model Context Protocol) bridge servers for integration with external clients and services (see [MCP Bridge Guide](./mcp.md))
+- **`download`**: Download all models required for GAIA agents (with streaming progress)
+- **`pull`**: Download/install a specific model from the Lemonade registry
 - **`stats`**: View model performance statistics from the most recent run
 - **`test`**: Run various audio/speech tests for development and troubleshooting
 - **`youtube`**: YouTube utilities for transcript downloading
@@ -590,6 +592,123 @@ Most MCP commands support:
 
 For detailed usage, configuration options, SDK integration, and examples, see the [MCP Bridge Guide](./mcp.md).
 
+## Download Command
+
+Download all models required for GAIA agents with streaming progress display:
+
+```bash
+gaia download [OPTIONS]
+```
+
+**Available options:**
+- `--agent`: Agent to download models for (default: all)
+- `--list`: List required models without downloading
+- `--timeout`: Timeout per model in seconds (default: 1800)
+- `--host`: Lemonade server host (default: localhost)
+- `--port`: Lemonade server port (default: 8000)
+
+**Available agents:** chat, code, talk, rag, blender, jira, docker, vlm, minimal, mcp
+
+**Examples:**
+```bash
+# List all required models and their download status
+gaia download --list
+
+# List models for a specific agent
+gaia download --list --agent chat
+
+# Download all models for all agents
+gaia download
+
+# Download models for chat agent only
+gaia download --agent chat
+
+# Download models for code agent
+gaia download --agent code
+```
+
+**Example output:**
+```
+📥 Downloading 3 model(s) for 'chat'...
+
+📥 Qwen3-Coder-30B-A3B-Instruct-GGUF
+   ⏳ [1/31] Qwen3-Coder-30B-A3B-Q4_K_M.gguf: 1.4 GB/17.7 GB (8%)
+   ⏳ [1/31] Qwen3-Coder-30B-A3B-Q4_K_M.gguf: 3.5 GB/17.7 GB (20%)
+   ...
+   ✅ Download complete
+
+✅ nomic-embed-text-v2-moe-GGUF (already downloaded)
+
+📥 Qwen2.5-VL-7B-Instruct-GGUF
+   ⏳ [1/3] qwen2.5-vl-7b-Q4_K_M.gguf: 500 MB/4.2 GB (12%)
+   ...
+   ✅ Download complete
+
+==================================================
+📊 Download Summary:
+   ✅ Downloaded: 2
+   ⏭️  Skipped (already available): 1
+==================================================
+```
+
+**Notes:**
+- Models are automatically downloaded when needed during agent initialization
+- Use `gaia download` to pre-download models before running agents
+- Streaming progress shows real-time download status every 5%
+- Already downloaded models are skipped automatically
+
+## Pull Command
+
+Download/install a specific model from the Lemonade Server registry:
+
+```bash
+gaia pull MODEL_NAME [OPTIONS]
+```
+
+**Available options:**
+- `--checkpoint`: HuggingFace checkpoint for custom models (e.g., unsloth/Model-GGUF:Q4_K_M)
+- `--recipe`: Lemonade recipe for custom models (e.g., llamacpp, oga-cpu)
+- `--reasoning`: Mark model as a reasoning model (like DeepSeek)
+- `--vision`: Mark model as having vision capabilities
+- `--embedding`: Mark model as an embedding model
+- `--reranking`: Mark model as a reranking model
+- `--mmproj`: Multimodal projector file for vision models
+- `--timeout`: Timeout in seconds for model download (default: 1200)
+- `--host`: Lemonade server host (default: localhost)
+- `--port`: Lemonade server port (default: 8000)
+
+**Examples:**
+```bash
+# Pull a registered model
+gaia pull Qwen3-0.6B-GGUF
+
+# Pull a specific model with streaming progress
+gaia pull Qwen3-Coder-30B-A3B-Instruct-GGUF
+
+# Pull and register a custom model from HuggingFace
+gaia pull user.Custom-Model-GGUF --checkpoint unsloth/Custom-Model-GGUF:Q4_K_M --recipe llamacpp
+
+# Pull a reasoning model
+gaia pull user.DeepSeek-GGUF --checkpoint unsloth/DeepSeek-R1-GGUF --recipe llamacpp --reasoning
+
+# Pull a vision model with mmproj
+gaia pull user.Vision-Model --checkpoint model/vision:Q4 --recipe llamacpp --vision --mmproj mmproj.gguf
+```
+
+**Example output:**
+```
+📥 Pulling model: Qwen3-0.6B-GGUF
+   ⏳ [1/2] qwen3-0.6b-Q4_K_M.gguf: 200 MB/450 MB (44%)
+   ⏳ [1/2] qwen3-0.6b-Q4_K_M.gguf: 400 MB/450 MB (89%)
+   ⏳ [2/2] config.json: 1.2 KB/1.2 KB (100%)
+✅ Model downloaded successfully: Qwen3-0.6B-GGUF
+```
+
+**Notes:**
+- Use the `user.` prefix for custom models not in the official registry
+- Custom models require both `--checkpoint` and `--recipe` parameters
+- The Lemonade server must be running for this command to work
+
 ## Evaluation Commands
 
 For comprehensive documentation of GAIA's evaluation system including systematic testing, benchmarking, and model comparison capabilities, see the **[Evaluation Guide](./eval.md)**.
@@ -790,7 +909,8 @@ lemonade-server serve
 
 **Model Issues:**
 - Make sure you have sufficient RAM (16GB+ recommended)
-- Check that your model files are properly downloaded
+- Check that your model files are properly downloaded: `gaia download --list`
+- Pre-download all required models: `gaia download`
 - Verify your Hugging Face token if prompted
 - To install additional models, see [Installing Additional Models](./features.md#installing-additional-models)
 

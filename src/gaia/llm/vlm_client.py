@@ -10,7 +10,16 @@ Handles model loading/unloading and image-to-text extraction via Lemonade server
 
 import base64
 import logging
+import os
 from typing import Optional
+
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Default Lemonade server URL (can be overridden via LEMONADE_BASE_URL env var)
+DEFAULT_LEMONADE_URL = "http://localhost:8000/api/v1"
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +37,7 @@ class VLMClient:
     def __init__(
         self,
         vlm_model: str = "Qwen2.5-VL-7B-Instruct-GGUF",
-        base_url: str = "http://localhost:8000/api/v1",
+        base_url: Optional[str] = None,
         auto_load: bool = True,
     ):
         """
@@ -36,9 +45,12 @@ class VLMClient:
 
         Args:
             vlm_model: Vision model to use for image extraction
-            base_url: Lemonade server API URL
+            base_url: Lemonade server API URL (defaults to LEMONADE_BASE_URL env var)
             auto_load: Automatically load VLM model on first use
         """
+        # Use provided base_url, fall back to env var, then default
+        if base_url is None:
+            base_url = os.getenv("LEMONADE_BASE_URL", DEFAULT_LEMONADE_URL)
         from urllib.parse import urlparse
 
         from gaia.llm.lemonade_client import LemonadeClient
@@ -51,11 +63,14 @@ class VLMClient:
         host = parsed.hostname or "localhost"
         port = parsed.port or 8000
 
+        # Get base server URL (without /api/v1) for user-facing messages
+        self.server_url = f"http://{host}:{port}"
+
         self.client = LemonadeClient(model=vlm_model, host=host, port=port)
         self.auto_load = auto_load
         self.vlm_loaded = False
 
-        logger.info(f"VLM Client initialized: {self.vlm_model}")
+        logger.info(f"VLM Client initialized: {self.vlm_model} at {self.server_url}")
 
     def check_availability(self) -> bool:
         """
@@ -77,9 +92,7 @@ class VLMClient:
                 logger.warning(f"❌ VLM model not found: {self.vlm_model}")
                 logger.warning("")
                 logger.warning("📥 To download this model:")
-                logger.warning(
-                    "   1. Open Lemonade Model Manager (http://localhost:8000)"
-                )
+                logger.warning(f"   1. Open Lemonade Model Manager ({self.server_url})")
                 logger.warning(f"   2. Search for: {self.vlm_model}")
                 logger.warning("   3. Click 'Download' to install the model")
                 logger.warning("")
@@ -91,7 +104,7 @@ class VLMClient:
         except Exception as e:
             logger.error(f"Failed to check VLM availability: {e}")
             logger.error(
-                "   Make sure Lemonade server is running at http://localhost:8000"
+                f"   Make sure Lemonade server is running at {self.server_url}"
             )
             return False
 
@@ -123,7 +136,7 @@ class VLMClient:
         except Exception as e:
             logger.error(f"Failed to load VLM model: {e}")
             logger.error(
-                "   Make sure Lemonade server is running at http://localhost:8000"
+                f"   Make sure Lemonade server is running at {self.server_url}"
             )
             return False
 
