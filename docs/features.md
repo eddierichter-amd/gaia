@@ -6,7 +6,7 @@ Currently, the following capabilities are available, more will be added in the n
 
 - **Windows 11**: Full GUI and CLI support with all features
 - **Linux (Ubuntu/Debian)**: Full GUI and CLI support with all features
-- **macOS**: Not supported
+- **macOS**: CLI support via source installation (see [Development Guide](./dev.md))
 
 | Use-Case Example   | Function                                 | Description                                                     | Platform Support |
 | ------------------ | ---------------------------------------- | --------------------------------------------------------------- | ---------------- |
@@ -27,7 +27,7 @@ The `gaia llm` command provides direct access to language models without requiri
 gaia llm "What is 1+1?"
 
 # Specify model and token limit
-gaia llm "Explain quantum computing" --model Llama-3.2-3B-Instruct-Hybrid --max-tokens 200
+gaia llm "Explain quantum computing" --model Qwen2.5-0.5B-Instruct-CPU --max-tokens 200
 
 # Disable streaming for batch processing
 gaia llm "Write a short poem" --no-stream
@@ -79,7 +79,7 @@ gaia chat --show-stats
 - `/help` - Show available commands
 - `quit`, `exit`, or `bye` - End the chat session
 
-**Requirements:** Requires lemonade-server to be running. The chat agent defaults to Llama-3.2-3B-Instruct-Hybrid model for optimal performance.
+**Requirements:** Requires lemonade-server to be running. The chat agent defaults to Qwen3-Coder-30B-A3B-Instruct-GGUF model for optimal performance.
 
 **Platform Availability**: Windows and Linux
 
@@ -201,7 +201,7 @@ gaia talk
 gaia talk --index manual.pdf
 
 # Use specific model with voice and document
-gaia talk --model Llama-3.2-3B-Instruct-Hybrid --index report.pdf
+gaia talk --model Qwen2.5-0.5B-Instruct-CPU --index report.pdf
 
 # Disable text-to-speech (ASR only) with document
 gaia talk --no-tts --index technical_manual.pdf

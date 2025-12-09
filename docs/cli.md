@@ -6,7 +6,7 @@ GAIA (Generative AI Acceleration Infrastructure & Applications) provides a comma
 
 - **Windows 11**: Full GUI and CLI support with installer and desktop shortcuts
 - **Linux (Ubuntu/Debian)**: Full GUI and CLI support via source installation
-- **macOS**: Not supported
+- **macOS**: CLI support via source installation (see [Development Guide](./dev.md))
 
 ## GAIA-CLI Getting Started Guide
 
@@ -53,7 +53,7 @@ The fastest way to interact with AI models is through the direct LLM command:
 2. Use advanced options:
    ```bash
    # Specify model and token limit
-   gaia llm "Explain quantum computing in simple terms" --model Llama-3.2-3B-Instruct-Hybrid --max-tokens 200
+   gaia llm "Explain quantum computing in simple terms" --model Qwen2.5-0.5B-Instruct-CPU --max-tokens 200
 
    # Disable streaming for batch processing
    gaia llm "Write a short poem about AI" --no-stream
@@ -132,6 +132,9 @@ gaia --help
 - **`talk`**: Start a voice-based conversation session
 - **`code`**: Python code assistant with analysis, generation, and linting (see [Code Guide](./code.md))
 - **`blender`**: Create and modify 3D scenes using the Blender agent (see [Blender Guide](./blender.md))
+- **`jira`**: Natural language interface for Atlassian tools - Jira, Confluence, and Compass (see [Jira Guide](./jira.md))
+- **`docker`**: Natural language interface for Docker containerization (see [Docker Guide](./docker.md))
+- **`summarize`**: Summarize meeting transcripts and emails with multiple output formats
 - **`api`**: Start and manage the GAIA API Server for VSCode and OpenAI-compatible integrations (see [API Server Guide](./api.md))
 - **`mcp`**: Start and manage MCP (Model Context Protocol) bridge servers for integration with external clients and services (see [MCP Bridge Guide](./mcp.md))
 - **`download`**: Download all models required for GAIA agents (with streaming progress)
@@ -174,7 +177,7 @@ gaia llm QUERY [OPTIONS]
 gaia llm "What is machine learning?"
 
 # Use specific model with token limit
-gaia llm "Explain neural networks" --model Llama-3.2-3B-Instruct-Hybrid --max-tokens 300
+gaia llm "Explain neural networks" --model Qwen2.5-0.5B-Instruct-CPU --max-tokens 300
 
 # Disable streaming for batch processing
 gaia llm "Generate a Python function to sort a list" --no-stream
@@ -191,8 +194,8 @@ gaia prompt "MESSAGE" [OPTIONS]
 ```
 
 **Available options:**
-- `--model`: Model to use for the agent (default: "Llama-3.2-3B-Instruct-Hybrid")
-- `--max-new-tokens`: Maximum number of new tokens to generate (default: 512)
+- `--model`: Model to use for the agent (default: "Qwen2.5-0.5B-Instruct-CPU")
+- `--max-tokens`: Maximum number of tokens to generate (default: 512)
 - `--stats`: Show performance statistics after generation
 
 **Examples:**
@@ -201,10 +204,10 @@ gaia prompt "MESSAGE" [OPTIONS]
 gaia prompt "What is the weather like today?"
 
 # Use a different model with stats
-gaia prompt "Create a poem about AI" --model Llama-3.2-3B-Instruct-Hybrid --stats
+gaia prompt "Create a poem about AI" --model Qwen2.5-0.5B-Instruct-CPU --stats
 
 # Use different model and token limit
-gaia prompt "Write a story" --model Llama-3.2-3B-Instruct-Hybrid --max-new-tokens 1000
+gaia prompt "Write a story" --model Qwen2.5-0.5B-Instruct-CPU --max-tokens 1000
 ```
 
 ## Chat Command
@@ -251,7 +254,7 @@ gaia chat --index doc1.pdf doc2.pdf doc3.pdf
 gaia chat --index report.pdf --query "Summarize the report"
 
 # Interactive mode with custom settings
-gaia chat --model Llama-3.2-3B-Instruct-Hybrid --streaming --show-stats
+gaia chat --model Qwen3-Coder-30B-A3B-Instruct-GGUF --streaming --show-stats
 
 # List available tools
 gaia chat --list-tools
@@ -436,7 +439,7 @@ gaia talk -i guide.pdf --no-tts  # Document Q&A, no TTS
 ```
 
 **Voice options:**
-- `--model`: Model to use for the agent (default: "Llama-3.2-3B-Instruct-Hybrid")
+- `--model`: Model to use for the agent (default: "Qwen2.5-0.5B-Instruct-CPU")
 - `--max-tokens`: Maximum number of tokens to generate (default: 512)
 - `--no-tts`: Disable text-to-speech in voice chat mode
 - `--audio-device-index`: Index of the audio input device to use (default: auto-detect)
@@ -576,10 +579,12 @@ gaia mcp test --query "What are the most popular LLMs on Hugging Face?"
 
 ### Available Subcommands
 
-- **`start`** - Start the main MCP bridge server
-- **`status`** - Check if the MCP server is running
-- **`test`** - Test MCP functionality with a sample query
-- **`atlassian`** - Start Atlassian integration for Jira/Confluence/Compass
+- **`start`** - Start the MCP bridge server
+- **`status`** - Check MCP server status
+- **`stop`** - Stop background MCP bridge server
+- **`test`** - Test MCP bridge functionality
+- **`agent`** - Test MCP orchestrator agent functionality
+- **`docker`** - Start Docker MCP server (per-agent architecture)
 
 ### Common Options
 
@@ -835,7 +840,7 @@ gaia test --test-type tts-audio-file --test-text "Save this as audio" --output-a
 **ASR options:**
 - `--input-audio-file`: Input audio file path for file transcription test
 - `--recording-duration`: Recording duration in seconds for microphone test (default: 10)
-- `--audio-device-index`: Index of audio input device (default: 1)
+- `--audio-device-index`: Index of audio input device (optional)
 - `--whisper-model-size`: Whisper model size [tiny, base, small, medium, large] (default: base)
 
 **Examples:**

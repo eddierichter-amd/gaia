@@ -50,7 +50,7 @@ Customize the voice interaction experience:
 gaia talk --whisper-model-size medium  # Options: tiny, base, small, medium, large
 
 # Specify which microphone to use
-gaia talk --audio-device-index 2  # Default: 1
+gaia talk --audio-device-index 2  # Optional, auto-detects by default
 
 # Show performance statistics
 gaia talk --stats
@@ -127,7 +127,7 @@ gaia test --test-type asr-microphone --recording-duration 15
 Options:
 - `--recording-duration`: Recording duration in seconds (default: 10)
 - `--whisper-model-size`: Choose Whisper model size ["tiny", "base", "small", "medium", "large"] (default: "base")
-- `--audio-device-index`: Select which microphone to use (default: 1)
+- `--audio-device-index`: Select which microphone to use (optional)
 
 ## Testing TTS Components
 You can test different aspects of the TTS system using the `gaia test` command with various test types:

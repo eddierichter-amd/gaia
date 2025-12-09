@@ -278,7 +278,7 @@ To quickly get started with GAIA via the command line, you can use the GAIA CLI 
 **Direct LLM Queries** (fastest option, no server management required):
 ```bash
 gaia llm "What is artificial intelligence?"
-gaia llm "Explain machine learning" --model llama3.2:3b --max-tokens 200
+gaia llm "Explain machine learning" --model Qwen2.5-0.5B-Instruct-CPU --max-tokens 200
 ```
 
 **Interactive Chat Sessions**:
@@ -312,7 +312,15 @@ gaia blender --example 2                        # Run specific example
 - `prompt` - Send single message to an agent
 - `chat` - Interactive text conversation
 - `talk` - Voice-based conversation
+- `code` - Python code assistant with analysis and generation
 - `blender` - Create and modify 3D scenes using the Blender agent
+- `jira` - Natural language interface for Atlassian tools
+- `docker` - Natural language interface for Docker containerization
+- `summarize` - Summarize meeting transcripts and emails
+- `api` - Start GAIA API server for IDE integrations
+- `mcp` - Start MCP bridge for external integrations
+- `download` - Download models for GAIA agents
+- `pull` - Download a specific model
 - `stats` - View performance statistics
 - `groundtruth` - Generate evaluation data with Claude
 - `test` - Run audio/speech tests
@@ -367,10 +375,10 @@ The best way to contribute is by adding a new agent that covers a unique use-cas
 
 GAIA with Ryzen AI Hybrid NPU/iGPU execution has been tested on the following system below. Any system that has the AMD Ryzen AI 9 300 series processor with NPU Driver 32.0.203.237 on Windows 11 or newer with minimum of 16GB of main memory should work. For more details on what is supported, see [here](https://www.amd.com/en/products/software/ryzen-ai-software.html#tabs-2733982b05-item-7720bb7a69-tab).
 
-⚠️ **NOTE**: 
+⚠️ **NOTE**:
 - **Windows**: Full GUI and CLI support with installer
 - **Linux**: Full GUI and CLI support via source installation
-- **macOS**: Not supported at this time
+- **macOS**: CLI support via source installation (see [Development Guide](docs/dev.md))
 
 GAIA has been tested on the following system:
 

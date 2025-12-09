@@ -90,36 +90,36 @@ gaia code "Create a todo CLI app" --debug
 # Show prompts sent to LLM in console
 gaia code "Create a todo CLI app" --show-prompts
 
-# Save complete trace to JSON file
-gaia code "Create a todo CLI app" --output trace.json
-
-# Include prompts in JSON conversation history
-gaia code "Create a todo CLI app" --output trace.json --debug-prompts
-
-# Maximum debug: console + JSON with full trace
-gaia code "Create a todo CLI app" --debug --show-prompts --debug-prompts --output full_trace.json
+# Save detailed JSON trace of agent execution
+gaia code "Create a todo CLI app" --trace
 
 # Silent mode: JSON output only (for scripts/automation)
-gaia code "Create a todo CLI app" --silent --output trace.json
+gaia code "Create a todo CLI app" --silent
+
+# Enable step-through debugging mode (pause at each agent step)
+gaia code "Create a todo CLI app" --step-through
 
 # Control maximum steps (default: 100)
 gaia code "Create a todo CLI app" --max-steps 150
 
 # Show LLM performance statistics (tokens, timing)
 gaia code "Create a todo CLI app" --show-stats
+
+# Maximum debug: console + trace with full logs
+gaia code "Create a todo CLI app" --debug --show-prompts --trace
 ```
 
 **Debug Flags:**
 - `--debug`: Enable DEBUG level logging with internal decision traces
 - `--show-prompts`: Display every prompt sent to the LLM in real-time
-- `--debug-prompts`: Include all prompts in the JSON conversation history
-- `--output <file>`: Save complete execution trace to JSON file
-- `--silent`: Suppress console output, only write to JSON file
+- `--trace`: Save detailed JSON trace of agent execution
+- `--silent`: Suppress console output, return JSON only
+- `--step-through`: Enable step-through debugging mode (pause at each agent step)
 - `--max-steps <n>`: Override default maximum steps (default: 100)
-- `--show-stats`: Display LLM performance statistics after each response (disabled by default)
+- `--stats`, `--show-stats`: Display LLM performance statistics after each response
 
 **JSON Output Structure:**
-The `--output` flag saves a complete trace with:
+The `--trace` flag saves a complete trace with:
 ```json
 {
   "status": "success",
@@ -127,7 +127,6 @@ The `--output` flag saves a complete trace with:
   "system_prompt": "Complete system prompt used",
   "conversation": [
     {"role": "user", "content": "User's query"},
-    {"role": "system", "content": {"prompt": "Step 1 prompt"}},  // if --debug-prompts
     {"role": "assistant", "content": {"thought": "...", "tool": "...", "tool_args": {...}}},
     {"role": "system", "content": {...}},  // Tool results
     ...
