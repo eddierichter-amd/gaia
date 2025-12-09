@@ -24,6 +24,9 @@ except ImportError:
         "Rich library not found. Install with 'pip install rich' for syntax highlighting."
     )
 
+# Display configuration constants
+MAX_DISPLAY_LINE_LENGTH = 120
+
 
 class OutputHandler(ABC):
     """
@@ -1057,11 +1060,10 @@ class AgentConsole(OutputHandler):
         total_lines = len(lines)
 
         # Truncate extremely long lines to prevent display issues
-        max_line_length = 120
         truncated_lines = []
         for line in lines:
-            if len(line) > max_line_length:
-                truncated_lines.append(line[:max_line_length] + "...")
+            if len(line) > MAX_DISPLAY_LINE_LENGTH:
+                truncated_lines.append(line[:MAX_DISPLAY_LINE_LENGTH] + "...")
             else:
                 truncated_lines.append(line)
 

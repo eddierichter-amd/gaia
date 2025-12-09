@@ -25,6 +25,13 @@ import psutil
 
 logger = logging.getLogger(__name__)
 
+# CLI configuration constants
+DEFAULT_PORT_RANGE_START = 3000
+DEFAULT_PORT_RANGE_END = 9999
+DEFAULT_COMMAND_TIMEOUT_SECS = 120
+MAX_OUTPUT_CHARS = 10_000
+MAX_ERROR_OUTPUT_CHARS = 2000
+
 
 @dataclass
 class ProcessInfo:
@@ -162,7 +169,9 @@ def is_port_available(port: int, host: str = "localhost") -> bool:
         return False
 
 
-def find_available_port(start: int = 3000, end: int = 9999) -> int:
+def find_available_port(
+    start: int = DEFAULT_PORT_RANGE_START, end: int = DEFAULT_PORT_RANGE_END
+) -> int:
     """
     Find the next available port in a range.
 
@@ -307,7 +316,7 @@ class CLIToolsMixin:
 
                 # Set default timeout for foreground commands
                 if timeout is None and not background:
-                    timeout = 120
+                    timeout = DEFAULT_COMMAND_TIMEOUT_SECS
 
                 # Detect port from command if not specified
                 if expected_port is None:
@@ -512,7 +521,7 @@ class CLIToolsMixin:
             stdout = result.stdout or ""
             stderr = result.stderr or ""
             truncated = False
-            max_output = 10_000
+            max_output = MAX_OUTPUT_CHARS
 
             if len(stdout) > max_output:
                 stdout = stdout[:max_output] + "\n...output truncated (stdout)..."
@@ -697,7 +706,7 @@ class CLIToolsMixin:
                 return {
                     "success": False,
                     "command": command,
-                    "output": final_output[-2000:],  # Last 2000 chars
+                    "output": final_output[-MAX_ERROR_OUTPUT_CHARS:],
                     "errors": errors_detected,
                     "suggestions": self._generate_error_suggestions(errors_detected),
                     "has_errors": True,

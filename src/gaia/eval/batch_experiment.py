@@ -23,6 +23,10 @@ try:
 except ImportError:
     PdfReader = None
 
+# Experiment configuration constants
+CREATIVE_TEMPERATURE_MAX = 0.7
+CREATIVE_TEMPERATURE_INCREMENT = 0.3
+
 
 def should_use_chat_template(task_type: str) -> bool:
     """
@@ -2131,7 +2135,10 @@ class BatchExperimentRunner:
                         "experiment_type": use_case,
                         "system_prompt": original_prompt,
                         "max_tokens": max_tokens,
-                        "temperature": min(0.7, temperature + 0.3),
+                        "temperature": min(
+                            CREATIVE_TEMPERATURE_MAX,
+                            temperature + CREATIVE_TEMPERATURE_INCREMENT,
+                        ),
                         "parameters": {},
                     }
                 )

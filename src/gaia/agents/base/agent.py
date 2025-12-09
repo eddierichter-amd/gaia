@@ -26,6 +26,10 @@ from gaia.chat.sdk import ChatConfig, ChatSDK
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Content truncation thresholds
+CHUNK_TRUNCATION_THRESHOLD = 5000
+CHUNK_TRUNCATION_SIZE = 2500
+
 
 class Agent(abc.ABC):
     """
@@ -884,12 +888,12 @@ class Agent(abc.ABC):
                 for chunk in truncated["chunks"]:
                     if isinstance(chunk, dict) and "content" in chunk:
                         # Keep full content for chunks (they're the actual data)
-                        # Only truncate if a single chunk is massive (>5000 chars)
-                        if len(chunk["content"]) > 5000:
+                        # Only truncate if a single chunk is massive
+                        if len(chunk["content"]) > CHUNK_TRUNCATION_THRESHOLD:
                             chunk["content"] = (
-                                chunk["content"][:2500]
+                                chunk["content"][:CHUNK_TRUNCATION_SIZE]
                                 + "\n...[chunk truncated]...\n"
-                                + chunk["content"][-2500:]
+                                + chunk["content"][-CHUNK_TRUNCATION_SIZE:]
                             )
 
             result_str = json.dumps(truncated, indent=2)
