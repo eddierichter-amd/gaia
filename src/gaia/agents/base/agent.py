@@ -105,6 +105,9 @@ class Agent(abc.ABC):
         Note: Uses local LLM server by default unless use_claude or use_chatgpt is True.
         """
         self.error_history = []  # Store error history for learning
+        self.conversation_history = (
+            []
+        )  # Store conversation history for session persistence
         self.max_steps = max_steps
         self.debug_prompts = debug_prompts
         self.show_prompts = show_prompts  # Separate flag for displaying prompts
@@ -982,6 +985,14 @@ CONTINUING WORK: When a plan completes, evaluate if more work is needed:
         conversation = []
         # Build messages array for chat completions
         messages = []
+
+        # Prepopulate with conversation history if available (for session persistence)
+        if hasattr(self, "conversation_history") and self.conversation_history:
+            messages.extend(self.conversation_history)
+            logger.debug(
+                f"Loaded {len(self.conversation_history)} messages from conversation history"
+            )
+
         steps_taken = 0
         final_answer = None
         error_count = 0

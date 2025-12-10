@@ -312,6 +312,9 @@ class ChatAgent(
         # Session management
         self.session_manager = SessionManager()
         self.current_session = None
+        self.conversation_history: List[Dict[str, str]] = (
+            []
+        )  # Track conversation for persistence
 
         # Call parent constructor
         super().__init__(
@@ -928,6 +931,9 @@ When user asks to "index my data folder" or similar:
                     self.watch_directories.append(dir_path)
                     self._watch_directory(dir_path)
 
+            # Restore conversation history
+            self.conversation_history = list(session.chat_history)
+
             logger.info(
                 f"Loaded session {session_id}: {len(session.indexed_documents)} docs, {len(session.chat_history)} messages"
             )
@@ -952,6 +958,7 @@ When user asks to "index my data folder" or similar:
             # Update session data
             self.current_session.indexed_documents = list(self.indexed_files)
             self.current_session.watched_directories = list(self.watch_directories)
+            self.current_session.chat_history = list(self.conversation_history)
 
             # Save
             return self.session_manager.save_session(self.current_session)
