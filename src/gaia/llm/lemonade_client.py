@@ -2250,6 +2250,7 @@ class LemonadeClient:
             success, error = client.validate_context_size(required_tokens=32768)
             if not success:
                 print(f"Context validation failed: {error}")
+                sys.exit(1)
         """
         try:
             health = self.health_check()
@@ -2267,7 +2268,7 @@ class LemonadeClient:
                     f"Restart with: lemonade-server serve --ctx-size {required_tokens}"
                 )
                 if not quiet:
-                    print(f"⚠️  {error_msg}")
+                    print(f"❌ {error_msg}")
                 return False, error_msg
 
         except Exception as e:
