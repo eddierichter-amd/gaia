@@ -683,6 +683,7 @@ Generate ONLY the code, no explanations."""
 
         Args:
             code: Code with errors
+            file_path: Path to the file (used to detect language)
             error_msg: Error message from linting/execution
             context: Additional context
             max_attempts: Maximum number of fix attempts
@@ -690,14 +691,20 @@ Generate ONLY the code, no explanations."""
         Returns:
             Fixed code or None if unable to fix
         """
+        # Detect language from file extension
+        is_typescript = file_path.endswith((".ts", ".tsx"))
+        is_python = file_path.endswith(".py")
+        lang = "typescript" if is_typescript else "python"
+        lang_label = "TypeScript" if is_typescript else "Python"
+
         for attempt in range(max_attempts):
-            prompt = f"""Fix the following Python code error:
+            prompt = f"""Fix the following {lang_label} code error:
 
 File path: {file_path}
 Error: {error_msg}
 
 Code:
-```python
+```{lang}
 {code}
 ```
 
@@ -710,17 +717,22 @@ Return ONLY the corrected code, no explanations."""
                 fixed_code = response.text.strip()
 
                 # Extract code from markdown blocks
-                if "```python" in fixed_code:
+                if f"```{lang}" in fixed_code:
                     fixed_code = (
-                        fixed_code.split("```python")[1].split("```")[0].strip()
+                        fixed_code.split(f"```{lang}")[1].split("```")[0].strip()
                     )
                 elif "```" in fixed_code:
                     fixed_code = fixed_code.split("```")[1].split("```")[0].strip()
 
-                # Validate the fix
-                validation = self.syntax_validator.validate_dict(fixed_code)
-                if validation["is_valid"]:
-                    return fixed_code
+                # Validate the fix (only for Python - TypeScript validated later)
+                if is_python:
+                    validation = self.syntax_validator.validate_dict(fixed_code)
+                    if validation["is_valid"]:
+                        return fixed_code
+                else:
+                    # For TypeScript, return the fix and let tsc validate
+                    if fixed_code and fixed_code != code:
+                        return fixed_code
 
             except Exception as e:
                 logger.warning(f"Fix attempt {attempt + 1} failed: {e}")
