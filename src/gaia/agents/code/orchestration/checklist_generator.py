@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 class ChatSDK(Protocol):
     """Protocol for chat SDK interface."""
 
-    def send(self, message: str, timeout: int = 600) -> Any:
+    def send(self, message: str, timeout: int = 600, no_history: bool = False) -> Any:
         """Send a message and get response."""
         ...
 
@@ -136,11 +136,7 @@ CHECKLIST_SYSTEM_PROMPT = """You are a code generation planner. Your task is to 
    - For "e-commerce": add price, inventory fields
 5. Ensure dependencies are satisfied (run setup before data, data before API, API before UI)
 6. Generate a complete checklist that creates a working application
-7. When follow-up fixes are requested, prioritize remediation templates:
-   - Use `write_file` to replace entire files with the correct content
-   - Use `edit_file` for focused replacements inside existing files
-   - Use `fix_code` when a validation log points to a TypeScript or lint issue in a specific file
-   Always reference the latest validation/test findings to decide which fixes to schedule before running validations again.
+7. When follow-up fixes are requested, use `fix_code` to repair the specific files called out by validation/test logs. Extract the precise file paths and line numbers from the errors (see the Raw Validation Logs) and pass those line numbers inside the error description so the fixer knows exactly where to focus. Always reference the latest findings to decide which fixes to schedule before running validations again.
 
 This workflow repeats until all validations pass, so each checklist should either advance new functionality or explicitly repair the failures reported in the latest validation logs.
 
@@ -190,7 +186,26 @@ Important:
 - REQUIRED: Include `setup_app_styling` after `create_next_app`
 - REQUIRED: Include `setup_testing` after `setup_app_styling`
 - REQUIRED: Include `generate_style_tests` after `setup_testing`
-- REQUIRED: End with `run_typescript_check`, then `validate_styles` as the last 2 commands"""
+- REQUIRED: End with `run_typescript_check`, then `validate_styles` as the last 2 commands
+- When converting a raw validation error into `fix_code`, copy the exact snippet (file, line, column, and message). For example:
+
+  Raw Validation Logs (example):
+  ```
+  {{"template": "run_typescript_check", "output": {{"errors": "path/to/File.tsx(10,5): error TS1234: <error text>\\n"}}}}
+  ```
+
+  Corresponding checklist item:
+  ```
+  {{
+    "template": "fix_code",
+    "params": {{
+      "file_path": "path/to/File.tsx",
+      "error_description": "path/to/File.tsx(10,5): error TS1234: <error text>"
+    }},
+    "description": "Fix the TypeScript compiler error reported for File.tsx."
+  }}
+  ```
+  Always keep the error text verbatim so the fixer knows exactly where to edit."""
 
 
 class ChecklistGenerator:
@@ -209,35 +224,50 @@ class ChecklistGenerator:
         """
         self.chat = chat_sdk
 
-    def generate(
+    def generate_initial_checklist(
         self,
         context: UserContext,
         project_state: Optional[ProjectState] = None,
     ) -> GeneratedChecklist:
-        """Generate checklist from user request.
-
-        Args:
-            context: User context with request and project info
-            project_state: Current state of the project (optional)
-
-        Returns:
-            GeneratedChecklist with items and reasoning
-        """
+        """Generate the initial project-scaffolding checklist."""
         if project_state is None:
             project_state = ProjectState()
 
-        # Build the prompt
         system_prompt = CHECKLIST_SYSTEM_PROMPT.format(
             catalog_prompt=get_catalog_prompt()
         )
-
-        user_prompt = self._build_user_prompt(context, project_state)
-
-        # Send to LLM
-        logger.debug("Generating checklist with LLM...")
-        logger.debug(f"User prompt: {user_prompt}")
-
+        user_prompt = self._build_initial_prompt(context, project_state)
         full_prompt = f"{system_prompt}\n\n## User Request\n\n{user_prompt}"
+        return self._generate_from_prompt(full_prompt)
+
+    def generate_debug_checklist(
+        self,
+        context: UserContext,
+        project_state: Optional[ProjectState],
+        prior_errors: Optional[List[str]],
+        validation_logs: Optional[List[Any]],
+    ) -> GeneratedChecklist:
+        """Generate a remediation checklist to fix outstanding errors."""
+        if project_state is None:
+            project_state = ProjectState()
+
+        debug_prompt = self._build_debug_prompt(
+            context=context,
+            project_state=project_state,
+            prior_errors=prior_errors or [],
+            validation_logs=validation_logs or [],
+        )
+        system_prompt = CHECKLIST_SYSTEM_PROMPT.format(
+            catalog_prompt=get_catalog_prompt()
+        )
+        full_prompt = f"{system_prompt}\n\n## Remediation Context\n\n{debug_prompt}"
+        return self._generate_from_prompt(full_prompt)
+
+    def _generate_from_prompt(self, full_prompt: str) -> GeneratedChecklist:
+        """Common checklist generation logic with retries."""
+        logger.debug("Generating checklist with LLM...")
+        logger.debug(f"Checklist prompt: {full_prompt}")
+
         max_attempts = 3
         last_failure_reason = "unknown error"
 
@@ -245,11 +275,10 @@ class ChecklistGenerator:
             try:
                 response = self.chat.send(full_prompt, timeout=1200)
 
-                # Extract text from response (handle different SDK response types)
                 response_text = self._extract_response_text(response)
+
                 logger.debug(f"LLM response (attempt {attempt}): {response_text}")
 
-                # Parse the checklist
                 checklist = self._parse_checklist(response_text)
             except Exception as exc:  # pylint: disable=broad-exception-caught
                 last_failure_reason = str(exc)
@@ -270,7 +299,6 @@ class ChecklistGenerator:
                 )
                 continue
 
-            # Validate the checklist; retry if validation errors are present
             self._validate_checklist(checklist)
             if checklist.validation_errors:
                 last_failure_reason = "; ".join(checklist.validation_errors)
@@ -294,7 +322,7 @@ class ChecklistGenerator:
             f"{last_failure_reason}"
         )
 
-    def _build_user_prompt(
+    def _build_initial_prompt(
         self,
         context: UserContext,
         project_state: ProjectState,
@@ -352,6 +380,79 @@ class ChecklistGenerator:
                     lines.append(f"  Output: {snippet}")
 
         lines.append("\nGenerate a checklist to fulfill this request.")
+
+        return "\n".join(lines)
+
+    def _build_debug_prompt(
+        self,
+        context: UserContext,
+        project_state: ProjectState,
+        prior_errors: List[str],
+        validation_logs: List[Any],
+    ) -> str:
+        """Build prompt for remediation/debug checklists."""
+        lines = [
+            "You are a remediation planner for the GAIA web development agent. "
+            "The project has already been scaffolded; focus exclusively on fixing outstanding issues."
+        ]
+        lines.append(f"\n**User Request**: {context.user_request}")
+        lines.append(f"\n**Project Directory**: {context.project_dir}")
+
+        if context.entity_name:
+            lines.append(f"\n**Entity**: {context.entity_name}")
+        if context.schema_fields:
+            lines.append(f"\n**Schema Fields**: {json.dumps(context.schema_fields)}")
+
+        lines.append(f"\n{project_state.to_prompt()}")
+
+        if prior_errors:
+            lines.append("\n**Execution Errors From Last Attempt:**")
+            for err in prior_errors:
+                lines.append(f"- {err}")
+
+        if validation_logs:
+            lines.append("\n**Recent Validation/Test Results:**")
+            raw_entries = []
+            for log in validation_logs[-10:]:
+                entry = log.to_dict() if hasattr(log, "to_dict") else log
+                template = entry.get("template", "unknown_step")
+                success = entry.get("success", True)
+                desc = entry.get("description", "")
+                status = "PASS" if success else "FAIL"
+                lines.append(f"- [{status}] {template}: {desc}")
+                if entry.get("error"):
+                    lines.append(f"  Error: {entry['error']}")
+                output = entry.get("output") or {}
+                for key in ("stdout", "stderr", "details", "message"):
+                    if output.get(key):
+                        snippet = str(output[key])[:200]
+                        lines.append(f"  Output: {snippet}")
+                        break
+                raw_entries.append(entry)
+
+            if raw_entries:
+                lines.append(
+                    "\n**Raw Validation Logs (exact text for follow-up fixes):**"
+                )
+                for entry in raw_entries:
+                    lines.append(json.dumps(entry, ensure_ascii=False))
+
+        if context.fix_feedback:
+            lines.append("\n**Outstanding Fix Instructions:**")
+            for note in context.fix_feedback[-10:]:
+                lines.append(f"- {note}")
+
+        lines.append(
+            "\nYour job: draft a concise checklist that repairs the errors above, "
+            "regenerates any broken code, and re-runs critical validations."
+        )
+        lines.append(
+            "\n**Critical Requirements for Debug Checklists:**\n"
+            "1. Use `fix_code` to repair the specific files referenced in the failures above.\n"
+            "2. Re-run any validations or tests that previously failed once fixes are applied.\n"
+            "3. Always include `run_typescript_check` as the second-to-last command to capture current compiler errors.\n"
+            "4. Always include `validate_styles` as the final command to capture CSS/design regressions."
+        )
 
         return "\n".join(lines)
 

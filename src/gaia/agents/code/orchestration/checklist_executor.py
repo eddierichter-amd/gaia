@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 class ChatSDK(Protocol):
     """Protocol for chat SDK interface used by LLM code generation."""
 
-    def send(self, message: str, timeout: int = 600) -> Any:
+    def send(self, message: str, timeout: int = 600, no_history: bool = False) -> Any:
         """Send a message and get response."""
         ...
 
@@ -63,8 +63,6 @@ DETERMINISTIC_TEMPLATES = {
     "validate_styles",
     "generate_style_tests",
     "run_tests",
-    "write_file",
-    "edit_file",
     "fix_code",
 }
 
@@ -83,13 +81,12 @@ TEMPLATE_METADATA: Dict[str, Dict[str, Any]] = {
     "generate_react_component": {
         "list": {
             "requires_client": False,
-            "expected_classes": ["glass-card", "page-title", "btn-primary"],
+            "expected_classes": ["page-title", "btn-primary"],
             "file_pattern": "src/app/{resource}s/page.tsx",
         },
         "form": {
             "requires_client": True,
             "expected_classes": [
-                "glass-card",
                 "input-field",
                 "btn-primary",
                 "btn-secondary",
@@ -98,13 +95,12 @@ TEMPLATE_METADATA: Dict[str, Dict[str, Any]] = {
         },
         "new": {
             "requires_client": True,
-            "expected_classes": ["glass-card", "page-title", "link-back"],
+            "expected_classes": ["page-title", "link-back"],
             "file_pattern": "src/app/{resource}s/new/page.tsx",
         },
         "detail": {
             "requires_client": True,
             "expected_classes": [
-                "glass-card",
                 "page-title",
                 "btn-primary",
                 "btn-danger",
@@ -128,14 +124,14 @@ TEMPLATE_METADATA: Dict[str, Dict[str, Any]] = {
     "setup_app_styling": {
         "default": {
             "requires_client": False,
-            "expected_classes": ["glass-card", "page-title", "btn-primary"],
+            "expected_classes": ["page-title", "btn-primary"],
             "file_pattern": "src/app/globals.css",
         },
     },
     "update_landing_page": {
         "default": {
             "requires_client": False,
-            "expected_classes": ["glass-card", "page-title"],
+            "expected_classes": ["page-title"],
             "file_pattern": "src/app/page.tsx",
         },
     },
@@ -259,8 +255,6 @@ TEMPLATE_TO_TOOL: Dict[str, str] = {
     "validate_styles": "validate_styles",  # CSS/design system validation (Issue #1002)
     "generate_style_tests": "generate_style_tests",  # Generate CSS tests
     "run_tests": "run_cli_command",  # Uses npm test
-    "write_file": "write_file",
-    "edit_file": "edit_file",
     "fix_code": "fix_code",
 }
 

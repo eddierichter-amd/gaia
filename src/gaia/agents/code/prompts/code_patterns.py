@@ -503,14 +503,14 @@ export function {Resource}Form({{ initialData, mode = "create" }}: {Resource}For
     const normalized = {{ ...data }};
 
     dateFields.forEach((field) => {{
-      const value = normalized[field];
+      const value = normalized[field as keyof typeof normalized];
       if (!value) {{
         return;
       }}
 
       const parsedValue = new Date(value as string | number | Date);
       if (!Number.isNaN(parsedValue.getTime())) {{
-        normalized[field] = parsedValue.toISOString();
+        (normalized as any)[field] = parsedValue.toISOString();
       }}
     }});
 

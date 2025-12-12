@@ -245,7 +245,6 @@ class WebToolsMixin:
             Returns:
                 Dictionary with success status and created files
             """
-            print("WE ARE IN MANAGE API ENDPOINT")
             try:
                 operations = operations or ["GET", "POST"]
 

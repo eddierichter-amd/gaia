@@ -30,10 +30,17 @@ from .steps.error_handler import ErrorHandler
 logger = logging.getLogger(__name__)
 
 
+def _estimate_token_count(text: str) -> int:
+    """Lightweight token estimate assuming ~4 characters per token."""
+    avg_chars_per_token = 4
+    byte_length = len(text.encode("utf-8"))
+    return max(1, (byte_length + avg_chars_per_token - 1) // avg_chars_per_token)
+
+
 class ChatSDK(Protocol):
     """Protocol for chat SDK interface used by checklist generator."""
 
-    def send(self, message: str, timeout: int = 600) -> Any:
+    def send(self, message: str, timeout: int = 600, no_history: bool = False) -> Any:
         """Send a message and get response."""
         ...
 
@@ -75,10 +82,7 @@ Decide if the application is ready to ship or if additional fixes are required.
 Rules:
 1. If ANY validation or test log failed, status must be \"needs_fix\" with concrete guidance.
 2. Only return \"complete\" when the app works end-to-end and validations passed.
-3. When fixes are needed, suggest actionable steps that can be executed through the tools:
-   - write_file (create or overwrite files)
-   - edit_file (targeted replacements inside files)
-   - fix_code (LLM-assisted repair of problematic files)
+3. When fixes are needed, suggest actionable steps that can be executed through `fix_code` (LLM-assisted repair of problematic files).
 
 Respond with concise JSON only:
 {
@@ -88,6 +92,8 @@ Respond with concise JSON only:
   \"fix_instructions\": [\"ordered actions the next checklist should perform\"]
 }
 """
+
+MAX_CHAT_HISTORY_TOKENS = 15000
 
 
 @dataclass
@@ -184,6 +190,8 @@ class Orchestrator:
         fix_feedback: List[str] = []
         iteration_outputs: List[Dict[str, Any]] = []
         combined_errors: List[str] = []
+        previous_execution_errors: List[str] = []
+        previous_validation_logs: List[Any] = []
 
         total_steps = 0
         steps_succeeded = 0
@@ -192,6 +200,14 @@ class Orchestrator:
 
         for iteration in range(1, self.max_checklist_loops + 1):
             logger.debug("Starting checklist iteration %d", iteration)
+
+            if iteration > 1:
+                summary_result = self._maybe_summarize_conversation_history()
+                if summary_result and self.console:
+                    self.console.print_info(
+                        "Conversation history summarized to stay within token limits."
+                    )
+
             project_state = analyzer.analyze(context.project_dir)
 
             # Surface accumulated signals to the next checklist prompt
@@ -209,7 +225,17 @@ class Orchestrator:
                 self.console.print_info(
                     f"Generating checklist iteration {iteration} of {self.max_checklist_loops}"
                 )
-            checklist = self.checklist_generator.generate(context, project_state)
+            if iteration == 1:
+                checklist = self.checklist_generator.generate_initial_checklist(
+                    context, project_state
+                )
+            else:
+                checklist = self.checklist_generator.generate_debug_checklist(
+                    context=context,
+                    project_state=project_state,
+                    prior_errors=previous_execution_errors,
+                    validation_logs=previous_validation_logs,
+                )
 
             if not checklist.is_valid:
                 logger.error(
@@ -259,6 +285,8 @@ class Orchestrator:
             combined_errors.extend(checklist_result.errors)
 
             aggregated_validation_logs.extend(checklist_result.validation_logs)
+            previous_execution_errors = checklist_result.errors.copy()
+            previous_validation_logs = checklist_result.validation_logs.copy()
 
             logger.info("Assessing application state after iteration %d", iteration)
             if self.console:
@@ -417,7 +445,7 @@ class Orchestrator:
         )
 
         try:
-            response = self.llm_client.send(prompt, timeout=1200)
+            response = self.llm_client.send(prompt, timeout=1200, no_history=True)
             data = self._parse_checkpoint_response(response)
             return CheckpointAssessment(
                 status=data.get("status", "needs_fix"),
@@ -432,7 +460,7 @@ class Orchestrator:
                 reasoning="Failed to interpret checkpoint reviewer output",
                 issues=[f"Checkpoint reviewer error: {exc}"],
                 fix_instructions=[
-                    "Inspect validation logs, then fix the root cause using write_file, edit_file, or fix_code."
+                    "Inspect validation logs, then fix the root cause using fix_code."
                 ],
             )
 
@@ -481,6 +509,26 @@ class Orchestrator:
         ]
 
         return "\n".join(sections)
+
+    def _maybe_summarize_conversation_history(self) -> Optional[str]:
+        """Trigger ChatSDK conversation summarization when available."""
+        chat_sdk = getattr(self, "llm_client", None)
+        if not chat_sdk or not hasattr(chat_sdk, "summarize_conversation_history"):
+            return None
+
+        try:
+            summary = chat_sdk.summarize_conversation_history(
+                max_history_tokens=MAX_CHAT_HISTORY_TOKENS
+            )
+            if summary:
+                logger.info(
+                    "Conversation history summarized to ~%d tokens",
+                    _estimate_token_count(summary),
+                )
+            return summary
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.exception("Failed to summarize conversation history: %s", exc)
+            return None
 
     def _format_validation_history(self, validation_history: List[Any]) -> str:
         """Format validation logs for the checkpoint prompt."""
