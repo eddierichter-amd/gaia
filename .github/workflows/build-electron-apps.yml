@@ -26,6 +26,7 @@ permissions:
 jobs:
   discover-apps:
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false || contains(github.event.pull_request.labels.*.name, 'ready_for_ci')
     outputs:
       matrix: ${{ steps.discover.outputs.matrix }}
       has_apps: ${{ steps.discover.outputs.has_apps }}

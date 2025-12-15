@@ -221,9 +221,22 @@ jobs:
           echo "Windows Tests: ${{ needs.test-mcp-windows.result }}"
           echo "Linux Tests: ${{ needs.test-mcp-linux.result }}"
           echo ""
-          
-          if [[ "${{ needs.test-mcp-windows.result }}" == "success" && 
-                "${{ needs.test-mcp-linux.result }}" == "success" ]]; then
+
+          # Check if all tests were skipped (draft PR without ready_for_ci label)
+          if [[ "${{ needs.test-mcp-windows.result }}" == "skipped" &&
+                "${{ needs.test-mcp-linux.result }}" == "skipped" ]]; then
+            echo "⏭️ All MCP tests skipped (draft PR - add 'ready_for_ci' label to run)"
+            exit 0
+          fi
+
+          # Helper function to check if result is acceptable (success or skipped)
+          check_result() {
+            [[ "$1" == "success" || "$1" == "skipped" ]]
+          }
+
+          # Check if all results are acceptable (success or skipped)
+          if check_result "${{ needs.test-mcp-windows.result }}" &&
+             check_result "${{ needs.test-mcp-linux.result }}"; then
             echo "✅ All MCP tests passed!"
             echo "Coverage:"
             echo "  ✅ HTTP-native bridge functionality"
