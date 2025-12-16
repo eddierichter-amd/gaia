@@ -37,7 +37,7 @@ jobs:
       INSTALLER_HASH: ${{ steps.calculate_hash.outputs.INSTALLER_HASH }}
       COMMIT_HASH: ${{ steps.get_commit.outputs.COMMIT_HASH }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Print Git History and Version Info
         run: |
