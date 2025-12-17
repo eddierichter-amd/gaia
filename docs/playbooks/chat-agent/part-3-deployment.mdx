@@ -346,7 +346,7 @@ def _generate_search_keys(self, query: str) -> List[str]:
     doc-qa = "my_agent.cli:main"
     ```
 
-    Install with: `pip install -e .`
+    Install with: `uv pip install -e .`
   </Tab>
 
   <Tab title="Usage">
@@ -375,7 +375,7 @@ def _generate_search_keys(self, query: str) -> List[str]:
     **Debugging:**
     ```python
     # Verify RAG dependencies
-    pip install -e .[rag]
+    uv pip install -e ".[rag]"
 
     # Check document exists
     import os
@@ -387,7 +387,7 @@ def _generate_search_keys(self, query: str) -> List[str]:
     ```
 
     **Common causes:**
-    - Missing RAG dependencies (`pip install -e .[rag]`)
+    - Missing RAG dependencies (`uv pip install -e ".[rag]"`)
     - Incorrect file path
     - File not readable
   </Accordion>
@@ -424,7 +424,7 @@ def _generate_search_keys(self, query: str) -> List[str]:
     **Solution:**
     ```bash
     # Install watchdog dependency
-    pip install watchdog>=2.1.0
+    uv pip install "watchdog>=2.1.0"
     ```
 
     **Verify:**

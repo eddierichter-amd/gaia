@@ -2109,7 +2109,7 @@ Examples:
             print("The evaluation dependencies are not installed.")
             print("")
             print("To fix this, install the evaluation dependencies:")
-            print("  pip install -e .[eval]")
+            print('  uv pip install -e ".[eval]"')
             print("")
             print("This will install required packages including:")
             print("  - anthropic (for Claude AI)")
@@ -2464,7 +2464,7 @@ Examples:
 
                         if not HAS_REPORTLAB:
                             print(
-                                "❌ Error: PDF output requires reportlab. Install with: pip install reportlab"
+                                "❌ Error: PDF output requires reportlab. Install with: uv pip install reportlab"
                             )
                             if args.format == "both":
                                 print(
@@ -2542,7 +2542,7 @@ Examples:
                             pdf_formatter = PDFFormatter()
                         else:
                             print(
-                                "⚠️  Warning: PDF output requires reportlab. Install with: pip install reportlab"
+                                "⚠️  Warning: PDF output requires reportlab. Install with: uv pip install reportlab"
                             )
                             if args.format == "pdf":
                                 print("❌ Cannot generate PDF files without reportlab.")
@@ -2660,7 +2660,7 @@ Let me know your answer!
                 log.debug("ASR initialized successfully")
             except ImportError:
                 log.error(
-                    "WhisperAsr not found. Please install voice support with: pip install -e .[talk]"
+                    'WhisperAsr not found. Please install voice support with: uv pip install -e ".[talk]"'
                 )
                 raise
             except Exception as e:
@@ -2746,7 +2746,7 @@ Let me know your answer!
                     "❌ Error: YouTube transcript functionality requires additional dependencies."
                 )
                 print(
-                    "Please install: pip install llama-index-readers-youtube-transcript"
+                    "Please install: uv pip install llama-index-readers-youtube-transcript"
                 )
                 print(f"Import error: {e}")
                 sys.exit(1)
@@ -3150,7 +3150,7 @@ Let me know your answer!
             print("The evaluation dependencies are not installed.")
             print("")
             print("To fix this, install the evaluation dependencies:")
-            print("  pip install -e .[eval]")
+            print('  uv pip install -e ".[eval]"')
             print("")
             print("This will install required packages including:")
             print("  - anthropic (for Claude AI)")
@@ -3323,7 +3323,7 @@ Let me know your answer!
             print("The evaluation dependencies are not installed.")
             print("")
             print("To fix this, install the evaluation dependencies:")
-            print("  pip install -e .[eval]")
+            print('  uv pip install -e ".[eval]"')
             print("")
             print("This will install required packages including:")
             print("  - anthropic (for Claude AI)")
@@ -3363,7 +3363,7 @@ Let me know your answer!
             print("The evaluation dependencies are not installed.")
             print("")
             print("To fix this, install the evaluation dependencies:")
-            print("  pip install -e .[eval]")
+            print('  uv pip install -e ".[eval]"')
             print("")
             print("This will install required packages including:")
             print("  - anthropic (for Claude AI)")
@@ -3727,7 +3727,7 @@ Let me know your answer!
                 print("The evaluation dependencies are not installed.")
                 print("")
                 print("To fix this, install the evaluation dependencies:")
-                print("  pip install -e .[eval]")
+                print('  uv pip install -e ".[eval]"')
                 print("")
                 print("This will install required packages including:")
                 print("  - anthropic (for Claude AI)")
@@ -3802,7 +3802,7 @@ Let me know your answer!
                 print("The evaluation dependencies are not installed.")
                 print("")
                 print("To fix this, install the evaluation dependencies:")
-                print("  pip install -e .[eval]")
+                print('  uv pip install -e ".[eval]"')
                 print("")
                 print("This will install required packages including:")
                 print("  - anthropic (for Claude AI)")
@@ -3878,7 +3878,7 @@ Let me know your answer!
             print("The evaluation dependencies are not installed.")
             print("")
             print("To fix this, install the evaluation dependencies:")
-            print("  pip install -e .[eval]")
+            print('  uv pip install -e ".[eval]"')
             print("")
             print("This will install required packages including:")
             print("  - anthropic (for Claude AI)")
@@ -4495,7 +4495,7 @@ def handle_jira_command(args):
     except ImportError as e:
         log.error(f"Failed to import Jira app: {e}")
         print("❌ Error: Jira app components are not available")
-        print("Make sure GAIA is installed properly: pip install -e .")
+        print("Make sure GAIA is installed properly: uv pip install -e .")
         sys.exit(1)
     except Exception as e:
         log.error(f"Error running Jira app: {e}")
@@ -4546,7 +4546,7 @@ def handle_docker_command(args):
     except ImportError as e:
         log.error(f"Failed to import Docker app: {e}")
         print("❌ Error: Docker app components are not available")
-        print("Make sure GAIA is installed properly: pip install -e .")
+        print("Make sure GAIA is installed properly: uv pip install -e .")
         sys.exit(1)
     except Exception as e:
         log.error(f"Error running Docker app: {e}")
@@ -4624,7 +4624,7 @@ def handle_api_command(args):
         except ImportError as e:
             log.error(f"Failed to import API server: {e}")
             print("❌ Error: API server components are not available")
-            print("Make sure uvicorn is installed: pip install uvicorn")
+            print("Make sure uvicorn is installed: uv pip install uvicorn")
             sys.exit(1)
         except KeyboardInterrupt:
             print("\n✅ API server stopped")
@@ -4866,7 +4866,7 @@ def handle_blender_command(args):
     # Check if Blender components are available
     if not BLENDER_AVAILABLE:
         print("❌ Error: Blender agent components are not available")
-        print("Install blender dependencies with: pip install -e .[blender]")
+        print('Install blender dependencies with: uv pip install -e ".[blender]"')
         sys.exit(1)
 
     # Initialize Lemonade with blender agent profile (32768 context)
@@ -5063,7 +5063,7 @@ def handle_mcp_start(args):
             print("❌ Error: MCP dependencies not installed.")
             print("")
             print("To fix this, install the MCP dependencies:")
-            print("  pip install -e .[mcp]")
+            print('  uv pip install -e ".[mcp]"')
             return
 
         # Import and start the HTTP-native MCP bridge

@@ -706,7 +706,7 @@ def enable_rag(self, documents: Optional[list] = None):
     except ImportError:
         self.log.warning(
             "RAG dependencies not available. "
-            "Install with: pip install -e .[rag]"
+            'Install with: uv pip install -e ".[rag]"'
         )
         return False
     except Exception as e:

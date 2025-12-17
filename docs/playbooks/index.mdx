@@ -195,18 +195,14 @@ All playbooks assume you have:
 
   <Tab title="GAIA Installed">
     ```bash
-    # Using uv (recommended)
     uv pip install amd-gaia
-
-    # Or using pip
-    pip install amd-gaia
     ```
   </Tab>
 
   <Tab title="Lemonade Server">
     ```bash
     # Install Lemonade Server (AMD-optimized for Ryzen AI)
-    pip install lemonade-server
+    uv pip install lemonade-server
 
     # Start with NPU/iGPU acceleration
     lemonade-server serve

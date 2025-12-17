@@ -72,7 +72,7 @@ ERROR_PATTERNS: List[ErrorPattern] = [
         pattern=r"ModuleNotFoundError:\s+No module named '([^']+)'",
         category=ErrorCategory.DEPENDENCY,
         action=RecoveryAction.FIX_AND_RETRY,
-        fix_command="pip install {module}",
+        fix_command="uv pip install {module}",
         max_retries=2,
     ),
     # TypeScript compilation - escalate to LLM

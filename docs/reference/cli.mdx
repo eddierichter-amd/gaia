@@ -7,15 +7,12 @@ GAIA provides a comprehensive command-line interface (CLI) for interacting with 
 
 ## Platform Support
 
-<CardGroup cols={3}>
+<CardGroup cols={2}>
   <Card title="Windows 11" icon="windows">
     Full GUI and CLI support with installer and desktop shortcuts
   </Card>
   <Card title="Linux" icon="linux">
     Full GUI and CLI support via source installation (Ubuntu/Debian)
-  </Card>
-  <Card title="macOS" icon="apple">
-    CLI support via source installation - [See Dev Guide](/reference/dev)
   </Card>
 </CardGroup>
 
@@ -409,8 +406,8 @@ curl http://localhost:8080/health
 ### Quick Start
 
 ```bash
-# Install MCP support (Linux/Windows)
-pip install -e .[mcp]
+# Install MCP support
+uv pip install -e ".[mcp]"
 
 # Start MCP bridge
 gaia mcp start

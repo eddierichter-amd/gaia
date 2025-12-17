@@ -11,23 +11,9 @@ The GAIA Chat SDK provides a programmable interface for building text-based conv
   <Step title="Install dependencies">
     Activate your virtual environment and install GAIA with RAG support:
 
-    <CodeGroup>
-    ```bash Windows/Linux
-    # Using uv (recommended - much faster)
-    uv pip install -e .[rag]
-
-    # Or using pip
-    pip install -e .[rag]
+    ```bash
+    uv pip install -e ".[rag]"
     ```
-
-    ```bash macOS
-    # Using uv (recommended)
-    uv pip install -e .[rag]
-
-    # Or using pip
-    pip install -e ".[rag]"
-    ```
-    </CodeGroup>
   </Step>
 
   <Step title="Create a simple chat">
@@ -380,14 +366,7 @@ print(f"Debug trace saved to: {result['output_file']}")
 <AccordionGroup>
   <Accordion title="Missing Dependencies">
     ```bash
-    # Using uv (recommended):
-    uv pip install -e .[rag]
-
-    # Or using pip:
-    # Linux/Windows:
-    pip install -e .[rag]
-    # macOS:
-    pip install -e ".[rag]"
+    uv pip install -e ".[rag]"
     ```
   </Accordion>
 

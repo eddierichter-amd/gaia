@@ -90,14 +90,7 @@ Before using the evaluation framework, ensure you have completed the initial GAI
 ## Installation
 
 ```bash
-# Using uv (recommended - much faster):
-uv pip install -e .[eval]
-
-# Or using pip:
-# Linux/Windows:
-pip install -e .[eval]
-# macOS:
-pip install -e ".[eval]"
+uv pip install -e ".[eval]"
 
 # Set up Claude API for synthetic data generation
 export ANTHROPIC_API_KEY=your_key_here
@@ -118,7 +111,6 @@ lemonade-server serve
 
   - If either command fails:
     - Windows: `winget install OpenJS.NodeJS.LTS`, then restart your shell
-    - macOS: `brew install node`
     - Linux: use your distro package manager (e.g., `apt install nodejs npm`)
   - The visualizer will automatically install its webapp dependencies on first launch
 
@@ -927,12 +919,7 @@ If you encounter numpy/pandas/sklearn import errors after installation:
 - ✅ **Fix**: Reinstall dependencies to rebuild against current numpy version:
   ```bash
   pip uninstall -y numpy pandas scikit-learn
-  # Using uv (recommended):
-  uv pip install -e .[eval]
-  # Or using pip (Linux/Windows):
-  pip install -e .[eval]
-  # macOS:
-  pip install -e ".[eval]"
+  uv pip install -e ".[eval]"
   ```
 - 🔍 **Why**: Binary incompatibility between numpy 2.x and older pandas/sklearn versions
 

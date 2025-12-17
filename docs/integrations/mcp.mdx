@@ -34,7 +34,7 @@ The GAIA MCP Server provides an HTTP-native bridge that exposes GAIA's AI agents
   <Step title="Install GAIA">
     MCP is included in base installation
     ```bash
-    pip install -e .
+    uv pip install -e .
     ```
   </Step>
 
@@ -411,9 +411,7 @@ The MCP server exposes the following GAIA agents as tools:
     **Solutions**:
     - Check server logs: `gaia mcp start --verbose`
     - Verify GAIA installation: `pip show gaia`
-    - Reinstall MCP dependencies:
-      - Linux/Windows: `pip install -e .[mcp]`
-      - macOS: `pip install -e ".[mcp]"`
+    - Reinstall MCP dependencies: `uv pip install -e ".[mcp]"`
   </Accordion>
 </AccordionGroup>
 

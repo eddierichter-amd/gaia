@@ -51,15 +51,9 @@ The GAIA Code Agent is an autonomous agent that handles coding tasks from requir
 
 <Steps>
   <Step title="Install development dependencies">
-    <CodeGroup>
-    ```bash Windows/Linux
-    pip install -e .[dev]
+    ```bash
+    uv pip install -e ".[dev]"
     ```
-
-    ```bash macOS
-    pip install -e ".[dev]"
-    ```
-    </CodeGroup>
   </Step>
 
   <Step title="Start Lemonade Server">
@@ -305,7 +299,7 @@ result = agent.process_query("Generate a function to sort a list")
 
   <Step title="Install API dependencies">
     ```bash
-    pip install -e .[api]
+    uv pip install -e ".[api]"
     ```
   </Step>
 
@@ -540,11 +534,11 @@ Benefits:
 
   <Accordion title="Other Common Issues">
     - **LLM timeout errors**: Ensure Lemonade server is running with `--ctx-size 32768`
-    - **Import errors**: Install with `pip install -e .[dev]` (Linux/Windows) or `pip install -e ".[dev]"` (macOS)
+    - **Import errors**: Install with `uv pip install -e ".[dev]"`
     - **File not found**: Check working directory and file paths
     - **Incomplete code generation**: Restart Lemonade server with larger context size
-    - **Pylint not found**: Ensure pylint is installed (`pip install pylint`)
-    - **Black not found**: Ensure black is installed (`pip install black`)
+    - **Pylint not found**: Ensure pylint is installed (`uv pip install pylint`)
+    - **Black not found**: Ensure black is installed (`uv pip install black`)
   </Accordion>
 </AccordionGroup>
 
