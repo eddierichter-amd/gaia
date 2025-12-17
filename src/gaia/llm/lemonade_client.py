@@ -1979,6 +1979,7 @@ class LemonadeClient:
         timeout: int = DEFAULT_MODEL_LOAD_TIMEOUT,
         auto_download: bool = False,
         download_timeout: int = 7200,
+        llamacpp_args: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Load a model on the server.
@@ -1995,6 +1996,8 @@ class LemonadeClient:
             auto_download: If True, automatically download the model if not available
             download_timeout: Timeout for model download in seconds (default: 7200 = 2 hours)
                              Large models can be 100GB+ and take hours to download
+            llamacpp_args: Optional llama.cpp arguments (e.g., "--ubatch-size 2048").
+                          Used to configure model loading parameters like batch sizes.
 
         Returns:
             Dict containing the status of the load operation
@@ -2007,6 +2010,8 @@ class LemonadeClient:
         self.log.info(f"Loading {model_name}")
 
         request_data = {"model_name": model_name}
+        if llamacpp_args:
+            request_data["llamacpp_args"] = llamacpp_args
         url = f"{self.base_url}/load"
 
         try:

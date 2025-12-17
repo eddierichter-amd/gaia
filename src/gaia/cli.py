@@ -238,33 +238,31 @@ def initialize_lemonade_for_agent(
                 print_lemonade_error(for_code_agent=(agent in ["code", "chat"]))
             return False, None, None
 
-        # For chat and code agents, check if context size is sufficient
-        # These agents require 32768 tokens and will fail mid-execution with
-        # cryptic errors if context is insufficient
+        # For chat and code agents, warn if context size may be insufficient
         required_ctx = 32768
         if agent in ["code", "chat"] and status.context_size < required_ctx:
             if not quiet:
                 print("")
                 print(
-                    f"❌ Insufficient context size for {agent} agent.", file=sys.stderr
+                    f"⚠️  Warning: Context size may be insufficient for {agent} agent.",
+                    file=sys.stderr,
                 )
                 print(
                     f"   Current: {status.context_size} tokens, "
-                    f"Required: {required_ctx} tokens",
+                    f"Recommended: {required_ctx} tokens",
                     file=sys.stderr,
                 )
                 print("", file=sys.stderr)
-                print("   To fix this issue:", file=sys.stderr)
                 print(
-                    "   1. Stop the Lemonade server (if running)",
+                    "   To increase context size, right-click the Lemonade tray icon",
                     file=sys.stderr,
                 )
                 print(
-                    f"   2. Restart with: lemonade-server serve --ctx-size {required_ctx}",
+                    "   and select a larger context size from the menu.",
                     file=sys.stderr,
                 )
                 print("", file=sys.stderr)
-            return False, None, None
+            # Continue anyway - don't block execution
 
         # Get server version for logging/debugging
         server_version = client.get_lemonade_version()
