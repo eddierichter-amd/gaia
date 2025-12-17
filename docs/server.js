@@ -47,8 +47,30 @@ function verifyToken(token) {
   return token === expected;
 }
 
-// Login page HTML
-const loginPage = `
+// Sanitize redirect URL to prevent open redirect attacks
+function sanitizeRedirect(url) {
+  // Must start with / but not // (protocol-relative URLs)
+  if (url && url.startsWith('/') && !url.startsWith('//')) {
+    return url;
+  }
+  return '/';
+}
+
+// HTML-escape a string to prevent XSS
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// Login page HTML ({{REDIRECT}} placeholder for original URL)
+function getLoginPage(redirectUrl) {
+  const safeRedirect = escapeHtml(sanitizeRedirect(redirectUrl));
+
+  return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -162,6 +184,7 @@ const loginPage = `
     <p class="subtitle">This documentation is access-restricted. Please enter the access code to continue.</p>
     {{ERROR}}
     <form method="POST" action="/auth/login">
+      <input type="hidden" name="redirect" value="${safeRedirect}">
       <div class="form-group">
         <input type="password" name="code" placeholder="Enter access code" required autofocus>
       </div>
@@ -174,6 +197,7 @@ const loginPage = `
 </body>
 </html>
 `;
+}
 
 // Health check endpoint (must be before auth middleware)
 app.get('/health', (req, res) => {
@@ -198,16 +222,15 @@ function authMiddleware(req, res, next) {
     return next();
   }
 
-  // Show login page
-  const errorHtml = req.query.error
-    ? '<div class="error">Invalid access code. Please try again.</div>'
-    : '';
-  res.status(401).send(loginPage.replace('{{ERROR}}', errorHtml));
+  // Show login page with original URL preserved for redirect after login
+  const originalUrl = req.originalUrl || req.url || '/';
+  res.status(401).send(getLoginPage(originalUrl).replace('{{ERROR}}', ''));
 }
 
 // Login handler
 app.post('/auth/login', (req, res) => {
-  const { code } = req.body;
+  const { code, redirect } = req.body;
+  const safeRedirect = sanitizeRedirect(redirect);
 
   if (code === ACCESS_CODE) {
     // Set signed cookie
@@ -219,10 +242,19 @@ app.post('/auth/login', (req, res) => {
       maxAge: COOKIE_MAX_AGE,
       sameSite: 'lax'
     });
-    res.redirect('/');
+    // Redirect to the original URL the user was trying to access
+    res.redirect(safeRedirect);
   } else {
-    res.redirect('/?error=invalid');
+    // Preserve the redirect URL even on error so user can retry
+    res.redirect(`/auth/login-error?redirect=${encodeURIComponent(safeRedirect)}`);
   }
+});
+
+// Login error handler (preserves redirect URL)
+app.get('/auth/login-error', (req, res) => {
+  const safeRedirect = sanitizeRedirect(req.query.redirect);
+  const errorHtml = '<div class="error">Invalid access code. Please try again.</div>';
+  res.status(401).send(getLoginPage(safeRedirect).replace('{{ERROR}}', errorHtml));
 });
 
 // Logout handler
