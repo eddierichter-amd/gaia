@@ -445,7 +445,7 @@ class Orchestrator:
         )
 
         try:
-            response = self.llm_client.send(prompt, timeout=1200, no_history=True)
+            response = self.llm_client.send(prompt, timeout=1200)
             data = self._parse_checkpoint_response(response)
             return CheckpointAssessment(
                 status=data.get("status", "needs_fix"),
@@ -472,7 +472,9 @@ class Orchestrator:
         validation_history: List[Any],
     ) -> str:
         """Build the prompt for the checkpoint reviewer."""
-        validation_summary = self._format_validation_history(validation_history)
+        validation_summary = self._format_validation_history(
+            validation_history, getattr(execution_result, "validation_logs", None)
+        )
 
         outstanding = (
             "\n".join(f"- {item}" for item in context.fix_feedback)
@@ -530,52 +532,70 @@ class Orchestrator:
             logger.exception("Failed to summarize conversation history: %s", exc)
             return None
 
-    def _format_validation_history(self, validation_history: List[Any]) -> str:
-        """Format validation logs for the checkpoint prompt."""
+    def _format_validation_history(
+        self, validation_history: List[Any], latest_plan_logs: Optional[List[Any]]
+    ) -> str:
+        """Format validation logs, splitting latest plan from historical ones."""
+
         if not validation_history:
             return "No validation or test commands have been executed yet."
 
-        lines: List[str] = []
-        recent = validation_history[-5:]
-        for entry in recent:
+        latest_logs = latest_plan_logs or []
+        latest_count = len(latest_logs)
+        historical_logs = (
+            validation_history[:-latest_count] if latest_count else validation_history
+        )
+
+        def normalize(entry: Any) -> Dict[str, Any]:
             if hasattr(entry, "to_dict"):
-                entry_data = entry.to_dict()
-            elif isinstance(entry, dict):
-                entry_data = entry
-            else:
-                entry_data = {}
+                return entry.to_dict()
+            if isinstance(entry, dict):
+                return entry
+            return {}
 
-            template = getattr(entry, "template", None) or entry_data.get("template")
-            description = getattr(entry, "description", None) or entry_data.get(
-                "description", ""
-            )
-            success = getattr(entry, "success", None)
-            if success is None:
-                success = entry_data.get("success", True)
-            status = "PASS" if success else "FAIL"
-            error = getattr(entry, "error", None) or entry_data.get("error")
-            output = getattr(entry, "output", None) or entry_data.get("output", {})
+        def render(entries: List[Any], limit: Optional[int] = None) -> List[str]:
+            if not entries:
+                return ["None"]
 
-            lines.append(f"- [{status}] {template}: {description}")
-            if error:
-                lines.append(f"  Error: {error}")
+            selected = entries if limit is None else entries[-limit:]
+            lines: List[str] = []
+            for entry in selected:
+                data = normalize(entry)
+                template = data.get("template", "unknown")
+                description = data.get("description", "")
+                success = data.get("success", True)
+                status = "PASS" if success else "FAIL"
+                error = data.get("error")
+                output = data.get("output", {})
 
-            snippet = ""
-            if isinstance(output, dict):
-                for key in ("stdout", "stderr", "message", "log", "details"):
-                    if output.get(key):
-                        snippet = str(output[key])
-                        break
-                if not snippet and output:
-                    snippet = json.dumps(output)[:400]
-            elif output:
-                snippet = str(output)[:400]
+                lines.append(f"- [{status}] {template}: {description}")
+                if error:
+                    lines.append(f"  Error: {error}")
 
-            snippet = snippet.strip()
-            if snippet:
-                lines.append(f"  Output: {snippet[:400]}")
+                snippet = ""
+                if isinstance(output, dict):
+                    for key in ("stdout", "stderr", "message", "log", "details"):
+                        if output.get(key):
+                            snippet = str(output[key])
+                            break
+                    if not snippet and output:
+                        snippet = json.dumps(output)[:400]
+                elif output:
+                    snippet = str(output)[:400]
 
-        return "\n".join(lines)
+                snippet = snippet.strip()
+                if snippet:
+                    lines.append(f"  Output: {snippet[:400]}")
+            return lines
+
+        sections: List[str] = []
+        sections.append("### Latest Plan Results")
+        sections.extend(render(list(latest_logs)))
+        sections.append("")
+        sections.append("### Previous Plan History")
+        sections.extend(render(list(historical_logs), limit=5))
+
+        return "\n".join(sections).strip()
 
     def _parse_checkpoint_response(self, response: Any) -> Dict[str, Any]:
         """Parse JSON output from the checkpoint reviewer."""
