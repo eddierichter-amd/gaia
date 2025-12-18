@@ -33,6 +33,7 @@ jobs:
         with:
           python-version: '3.12'
           install-package: '.[dev,talk,rag]'
+          extra-index-url: 'https://download.pytorch.org/whl/cpu'
 
       - name: Verify GAIA installation
         shell: powershell

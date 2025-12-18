@@ -33,6 +33,7 @@ jobs:
       with:
         python-version: '3.12'
         install-package: '.[dev,rag]'
+        extra-index-url: 'https://download.pytorch.org/whl/cpu'
 
     - name: Install additional test dependencies
       run: |
@@ -64,6 +65,7 @@ jobs:
       with:
         python-version: '3.12'
         install-package: '.[dev,rag]'
+        extra-index-url: 'https://download.pytorch.org/whl/cpu'
 
     - name: Install additional test dependencies
       shell: powershell

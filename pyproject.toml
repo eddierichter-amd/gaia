@@ -48,3 +48,16 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "--tb=short --strict-markers"
+
+# UV configuration for PyTorch CPU-only builds
+# GAIA is optimized for AMD hardware and doesn't require NVIDIA/CUDA dependencies
+# This ensures torch, torchvision, and torchaudio are installed from CPU-only index
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+torchvision = [{ index = "pytorch-cpu" }]
+torchaudio = [{ index = "pytorch-cpu" }]
