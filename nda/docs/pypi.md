@@ -7,11 +7,13 @@ This guide explains how to build and publish the GAIA package to PyPI.
 
 ## Prerequisites
 
-Install the required build tools:
+Install the required tools:
 
 ```bash
-uv pip install build twine
+uv pip install twine
 ```
+
+> **Note:** `uv build` is built into uv, no separate `build` package needed.
 
 ## Setting Up a PyPI Account
 
@@ -67,7 +69,7 @@ The package name is claimed with your first successful upload:
 
 ```bash
 # Build the package first
-python -m build
+uv build
 
 # Upload to claim the name
 twine upload dist/*
@@ -94,29 +96,44 @@ For team projects, consider creating a PyPI Organization:
 3. Transfer project ownership to the organization
 4. Add team members to the organization with appropriate roles
 
-## 1. Update Version
+## Publishing Workflow
+
+> **IMPORTANT: PyPI does not allow overwriting existing versions.** Once a version is uploaded, that exact filename can never be uploaded again. This is a security feature to prevent supply chain attacks. Always bump the version number for new releases.
+
+### Step 1: Update Version
 
 Edit `src/gaia/version.py` and bump the version number:
 
 ```python
-__version__ = "0.14.1"  # Bump as needed
+__version__ = "0.14.2"  # Bump as needed
 ```
 
-## 2. Build the Package
+### Step 2: Clean and Build the Package
+
+> **CRITICAL:** Always clean the `dist/` directory before building. If old wheel files remain, `twine upload dist/*` will attempt to upload them alongside the new version, causing "File already exists" errors.
 
 ```bash
-# Clean previous builds
+# REQUIRED: Clean previous builds first
 rm -rf dist/ build/ *.egg-info
 
+# Verify dist/ is empty (should show nothing or "No such file")
+ls dist/
+
 # Build source distribution and wheel
-python -m build
+uv build
+
+# Verify only ONE version exists in dist/
+ls dist/
+# Should show ONLY:
+#   amd_gaia-X.Y.Z.tar.gz
+#   amd_gaia-X.Y.Z-py3-none-any.whl
 ```
 
 This creates files in `dist/`:
 - `amd_gaia-X.Y.Z.tar.gz` (source distribution)
 - `amd_gaia-X.Y.Z-py3-none-any.whl` (wheel)
 
-## 3. Verify the Package
+### Step 3: Verify the Package
 
 ```bash
 # Check package metadata
@@ -126,7 +143,7 @@ twine check dist/*
 uv pip install dist/amd_gaia-*.whl
 ```
 
-## 4. Testing with External Projects Locally
+## Testing with External Projects Locally
 
 Before publishing to PyPI, you should test the GAIA wheel with external projects (like third-party agents) to ensure everything works correctly.
 
@@ -151,7 +168,7 @@ cd /path/to/gaia
 rm -rf dist/ build/ *.egg-info
 
 # Build fresh wheel
-python -m build
+uv build
 ```
 
 This creates `dist/amd_gaia-X.Y.Z-py3-none-any.whl` (version varies).
@@ -203,7 +220,7 @@ cd /path/to/gaia
 
 # Rebuild wheel
 rm -rf dist/
-python -m build
+uv build
 
 # Terminal 2: External project
 cd /path/to/your-agent
@@ -296,7 +313,7 @@ pytest tests/ -v  # Test immediately
 
 # 3. Once feature is stable, test with wheel
 cd /path/to/gaia
-python -m build
+uv build
 cd /path/to/your-agent
 uv pip install --force-reinstall /path/to/gaia/dist/amd_gaia-*.whl
 pytest tests/ -v  # Full test suite
@@ -315,6 +332,40 @@ twine upload dist/*
 ```
 
 ### Troubleshooting
+
+**Problem: "File already exists" error when uploading to PyPI**
+
+```
+ERROR    HTTPError: 400 Bad Request from https://upload.pypi.org/legacy/
+         File already exists ('amd_gaia-0.14.1-py3-none-any.whl', ...)
+```
+
+This happens when:
+1. **Old wheel files in `dist/`**: You rebuilt without cleaning, so both old and new versions exist
+2. **Version not bumped**: You're trying to re-upload an already published version
+
+**Solution:**
+
+```bash
+# Check what's in dist/ - look for multiple versions
+ls dist/
+# Bad: amd_gaia-0.14.1-py3-none-any.whl AND amd_gaia-0.14.2-py3-none-any.whl
+# Good: Only amd_gaia-0.14.2-py3-none-any.whl
+
+# Clean and rebuild
+rm -rf dist/ build/ *.egg-info
+uv build
+
+# Verify only one version
+ls dist/
+
+# Now upload
+twine upload dist/*
+```
+
+If the version was already published, you MUST bump the version number in `src/gaia/version.py` and rebuild. PyPI does not allow overwriting existing versions.
+
+---
 
 **Problem: "Module not found" after installing wheel**
 
@@ -356,7 +407,7 @@ importlib.reload(gaia)
 # If using wheel install, ensure you rebuilt:
 cd /path/to/gaia
 rm -rf dist/
-python -m build
+uv build
 uv pip install --force-reinstall dist/amd_gaia-*.whl
 ```
 
@@ -397,7 +448,7 @@ gaia --help  # Should work
 gaia list-agents  # Should show built-in agents
 ```
 
-## 5. Publish to Test PyPI (Recommended First)
+### Step 4: Publish to Test PyPI (Recommended First)
 
 ```bash
 twine upload --repository testpypi dist/*
@@ -409,7 +460,7 @@ Test the installation:
 uv pip install --index-url https://test.pypi.org/simple/ amd-gaia
 ```
 
-## 6. Publish to Production PyPI
+### Step 5: Publish to Production PyPI
 
 ```bash
 twine upload dist/*
@@ -459,7 +510,7 @@ twine upload dist/*
 
 | Command | Description |
 |---------|-------------|
-| `python -m build` | Build the package |
+| `uv build` | Build the package |
 | `twine check dist/*` | Verify package metadata |
 | `twine upload --repository testpypi dist/*` | Upload to Test PyPI |
 | `twine upload dist/*` | Upload to Production PyPI |
