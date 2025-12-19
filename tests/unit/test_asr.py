@@ -9,9 +9,22 @@ import time
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from gaia.audio.whisper_asr import WhisperAsr
+import pytest
+
+# Skip entire module if audio dependencies not available
+try:
+    from gaia.audio.whisper_asr import WhisperAsr
+    from gaia.talk.sdk import TalkConfig, TalkSDK
+
+    HAS_AUDIO_DEPS = True
+except ImportError:
+    HAS_AUDIO_DEPS = False
+
 from gaia.logger import get_logger
-from gaia.talk.sdk import TalkConfig, TalkSDK
+
+pytestmark = pytest.mark.skipif(
+    not HAS_AUDIO_DEPS, reason="Audio dependencies (pyaudio) not available"
+)
 
 
 class TestWhisperAsr(unittest.TestCase):

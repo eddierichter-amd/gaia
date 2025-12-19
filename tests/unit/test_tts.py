@@ -5,11 +5,24 @@ import os
 import unittest
 from pathlib import Path
 
-import numpy as np
-import soundfile as sf
+import pytest
 
-from gaia.audio.kokoro_tts import KokoroTTS
+# Skip entire module if audio dependencies not available
+try:
+    import numpy as np
+    import soundfile as sf
+
+    from gaia.audio.kokoro_tts import KokoroTTS
+
+    HAS_AUDIO_DEPS = True
+except ImportError:
+    HAS_AUDIO_DEPS = False
+
 from gaia.logger import get_logger
+
+pytestmark = pytest.mark.skipif(
+    not HAS_AUDIO_DEPS, reason="Audio dependencies (soundfile) not available"
+)
 
 
 class TestKokoroTTS(unittest.TestCase):

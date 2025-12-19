@@ -27,6 +27,7 @@ setup(
         "gaia.llm",
         "gaia.audio",
         "gaia.chat",
+        "gaia.database",
         "gaia.talk",
         "gaia.apps",
         "gaia.apps.llm",

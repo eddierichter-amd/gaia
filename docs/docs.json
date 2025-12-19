@@ -63,7 +63,8 @@
                 "group": "Mixins & Extensions",
                 "pages": [
                   "sdk/mixins/tool-mixins",
-                  "sdk/mixins/code-mixins"
+                  "sdk/mixins/code-mixins",
+                  "sdk/mixins/database-mixin"
                 ]
               },
               {

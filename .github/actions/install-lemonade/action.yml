@@ -18,7 +18,8 @@ runs:
     - name: Get Expected Lemonade Version
       shell: powershell
       run: |
-        $lemonadeVersion = python -c "import sys; sys.path.append('src'); from gaia.version import LEMONADE_VERSION; print(LEMONADE_VERSION)"
+        # Import directly from version module to avoid triggering gaia/__init__.py
+        $lemonadeVersion = python -c "import sys; sys.path.insert(0, 'src/gaia'); from version import LEMONADE_VERSION; print(LEMONADE_VERSION)"
         echo "LEMONADE_VERSION=$lemonadeVersion" >> $env:GITHUB_ENV
         Write-Host "Expected Lemonade version: $lemonadeVersion"
 

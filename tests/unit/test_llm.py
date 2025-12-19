@@ -108,13 +108,11 @@ class TestLlmCli(unittest.TestCase):
 
         # Check command availability first
         if not self._check_command_availability():
-            self.fail("gaia command is not available. Cannot run LLM tests.")
+            self.skipTest("gaia command is not available")
 
         # Check if server is accessible
         if not self._check_lemonade_server_health():
-            self.fail(
-                "Lemonade server is not running or not accessible. Cannot run LLM tests."
-            )
+            self.skipTest("Lemonade server is not running")
 
         try:
             # Test with explicit --base-url (without /api/v1 to test normalization)
