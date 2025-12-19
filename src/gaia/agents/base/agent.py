@@ -17,6 +17,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from gaia.agents.base.console import AgentConsole, SilentConsole
+from gaia.agents.base.errors import format_execution_trace
 from gaia.agents.base.tools import _TOOL_REGISTRY
 
 # First-party imports
@@ -123,6 +124,9 @@ class Agent(abc.ABC):
         self.debug = debug
         self.last_result = None  # Store the most recent result
         self.max_plan_iterations = max_plan_iterations
+        self._current_query: Optional[str] = (
+            None  # Store current query for error context
+        )
 
         # Read base_url from environment if not provided
         if base_url is None:
@@ -786,9 +790,29 @@ You must respond ONLY in valid JSON. No text before { or after }.
             self.error_history.append(error_msg)
             return {"status": "error", "error": error_msg, "timeout": True}
         except Exception as e:
-            logger.error(f"Error executing tool {tool_name}: {str(e)}")
-            self.error_history.append(str(e))
-            return {"status": "error", "error": str(e)}
+            # Format error with full execution trace for debugging
+            formatted_error = format_execution_trace(
+                exception=e,
+                query=getattr(self, "_current_query", None),
+                plan_step=self.current_step + 1 if self.current_plan else None,
+                total_steps=self.total_plan_steps if self.current_plan else None,
+                tool_name=tool_name,
+                tool_args=tool_args,
+            )
+            logger.error(f"Error executing tool {tool_name}: {e}")
+            self.error_history.append(str(e))  # Store brief error, not formatted
+
+            # Print to console immediately so user sees it
+            self.console.print_error(formatted_error)
+
+            return {
+                "status": "error",
+                "error_brief": str(e),  # Brief error message for quick reference
+                "error_displayed": True,  # Flag to prevent duplicate display
+                "tool_name": tool_name,
+                "tool_args": tool_args,
+                "plan_step": self.current_step + 1 if self.current_plan else None,
+            }
 
     def _generate_max_steps_message(
         self, conversation: List[Dict], steps_taken: int, steps_limit: int
@@ -1046,6 +1070,9 @@ You must respond ONLY in valid JSON. No text before { or after }.
 
         start_time = time.time()  # Track query processing start time
 
+        # Store query for error context (used in _execute_tool for error formatting)
+        self._current_query = user_input
+
         logger.debug(f"Processing query: {user_input}")
         conversation = []
         # Build messages array for chat completions
@@ -1248,8 +1275,10 @@ You must respond ONLY in valid JSON. No text before { or after }.
                     if is_error:
                         error_count += 1
                         # Extract error message from various formats
+                        # Prefer error_brief for logging (avoids duplicate formatted output)
                         last_error = (
-                            tool_result.get("error")
+                            tool_result.get("error_brief")
+                            or tool_result.get("error")
                             or tool_result.get("stderr")
                             or tool_result.get("hint")  # Many tools provide hints
                             or tool_result.get(
@@ -1260,7 +1289,9 @@ You must respond ONLY in valid JSON. No text before { or after }.
                         logger.warning(
                             f"Tool execution error in plan (count: {error_count}): {last_error}"
                         )
-                        self.console.print_error(last_error)
+                        # Only print if error wasn't already displayed by _execute_tool
+                        if not tool_result.get("error_displayed"):
+                            self.console.print_error(last_error)
 
                         # Switch to error recovery state
                         self.execution_state = self.STATE_ERROR_RECOVERY
@@ -1895,8 +1926,10 @@ You must respond ONLY in valid JSON. No text before { or after }.
                 )
                 if is_error:
                     error_count += 1
+                    # Prefer error_brief for logging (avoids duplicate formatted output)
                     last_error = (
-                        tool_result.get("error")
+                        tool_result.get("error_brief")
+                        or tool_result.get("error")
                         or tool_result.get("stderr")
                         or tool_result.get("hint")
                         or tool_result.get("suggested_fix")
@@ -1905,7 +1938,9 @@ You must respond ONLY in valid JSON. No text before { or after }.
                     logger.warning(
                         f"Tool execution error in plan (count: {error_count}): {last_error}"
                     )
-                    self.console.print_error(last_error)
+                    # Only print if error wasn't already displayed by _execute_tool
+                    if not tool_result.get("error_displayed"):
+                        self.console.print_error(last_error)
 
                     # Switch to error recovery state
                     self.execution_state = self.STATE_ERROR_RECOVERY
