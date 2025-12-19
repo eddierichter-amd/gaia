@@ -1085,6 +1085,86 @@ class AgentConsole(OutputHandler):
             print(f"\n📌 {name}({params_str})")
             print(f"   {description}")
 
+    # === File Watcher Output Methods ===
+
+    def print_file_created(
+        self, filename: str, size: int = 0, extension: str = ""
+    ) -> None:
+        """
+        Print file created notification with styling.
+
+        Args:
+            filename: Name of the file
+            size: Size in bytes
+            extension: File extension
+        """
+        if self.rich_available:
+            self.console.print(
+                f"\n[bold green]📄 New file detected:[/bold green] [cyan]{filename}[/cyan]"
+            )
+            size_str = self._format_file_size(size)
+            self.console.print(f"   [dim]Size:[/dim] {size_str}")
+            self.console.print(f"   [dim]Type:[/dim] {extension or 'unknown'}")
+        else:
+            print(f"\n📄 New file detected: {filename}")
+            print(f"   Size: {size} bytes")
+            print(f"   Type: {extension or 'unknown'}")
+
+    def print_file_modified(self, filename: str) -> None:
+        """
+        Print file modified notification.
+
+        Args:
+            filename: Name of the file
+        """
+        if self.rich_available:
+            self.console.print(
+                f"\n[bold yellow]✏️  File modified:[/bold yellow] [cyan]{filename}[/cyan]"
+            )
+        else:
+            print(f"\n✏️  File modified: {filename}")
+
+    def print_file_deleted(self, filename: str) -> None:
+        """
+        Print file deleted notification.
+
+        Args:
+            filename: Name of the file
+        """
+        if self.rich_available:
+            self.console.print(
+                f"\n[bold red]🗑️  File deleted:[/bold red] [cyan]{filename}[/cyan]"
+            )
+        else:
+            print(f"\n🗑️  File deleted: {filename}")
+
+    def print_file_moved(self, src_filename: str, dest_filename: str) -> None:
+        """
+        Print file moved notification.
+
+        Args:
+            src_filename: Original filename
+            dest_filename: New filename
+        """
+        if self.rich_available:
+            self.console.print(
+                f"\n[bold magenta]📦 File moved:[/bold magenta] "
+                f"[cyan]{src_filename}[/cyan] → [cyan]{dest_filename}[/cyan]"
+            )
+        else:
+            print(f"\n📦 File moved: {src_filename} → {dest_filename}")
+
+    def _format_file_size(self, size_bytes: int) -> str:
+        """Format file size in human-readable format."""
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.1f} KB"
+        elif size_bytes < 1024 * 1024 * 1024:
+            return f"{size_bytes / (1024 * 1024):.1f} MB"
+        else:
+            return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+
     def start_file_preview(
         self, filename: str, max_lines: int = 15, title_prefix: str = "📄"
     ) -> None:

@@ -5,19 +5,13 @@ Chat Agent - Interactive chat with RAG and file search capabilities.
 """
 
 import os
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 try:
-    from watchdog.events import FileSystemEventHandler
     from watchdog.observers import Observer
 except ImportError:
-    # Create dummy base class when watchdog is not available
-    class FileSystemEventHandler:
-        """Dummy base class when watchdog is not installed."""
-
     Observer = None
 
 from gaia.agents.base.agent import Agent
@@ -28,6 +22,7 @@ from gaia.agents.tools import FileSearchToolsMixin  # Shared file search tools
 from gaia.logger import get_logger
 from gaia.rag.sdk import RAGSDK, RAGConfig
 from gaia.security import PathValidator
+from gaia.utils.file_watcher import FileChangeHandler, check_watchdog_available
 
 logger = get_logger(__name__)
 
@@ -65,150 +60,6 @@ class ChatAgentConfig:
 
     # Security
     allowed_paths: Optional[List[str]] = None
-
-
-class FileChangeHandler(FileSystemEventHandler):
-    """Handler for file system changes to trigger re-indexing and removal."""
-
-    def __init__(self, agent):
-        self.agent = agent
-        self.last_indexed = {}
-        self.debounce_time = 2.0  # seconds
-        self.telemetry = {
-            "files_added": 0,
-            "files_modified": 0,
-            "files_deleted": 0,
-            "files_moved": 0,
-            "total_events": 0,
-            "last_event_time": None,
-        }
-
-    def on_created(self, event):
-        """Handle file creation."""
-        if not event.is_directory and self._should_index(event.src_path):
-            self._schedule_reindex(event.src_path)
-            self._update_telemetry("files_added", event.src_path)
-
-    def on_modified(self, event):
-        """Handle file modification."""
-        if not event.is_directory and self._should_index(event.src_path):
-            self._schedule_reindex(event.src_path)
-            self._update_telemetry("files_modified", event.src_path)
-
-    def on_deleted(self, event):
-        """Handle file deletion."""
-        if not event.is_directory and self._should_index(event.src_path):
-            self._handle_deletion(event.src_path)
-            self._update_telemetry("files_deleted", event.src_path)
-
-    def on_moved(self, event):
-        """Handle file move/rename."""
-        if not event.is_directory:
-            # Remove old path if it was indexed
-            if self._should_index(event.src_path):
-                self._handle_deletion(event.src_path)
-            # Add new path if it should be indexed
-            if self._should_index(event.dest_path):
-                self._schedule_reindex(event.dest_path)
-            self._update_telemetry(
-                "files_moved", f"{event.src_path} -> {event.dest_path}"
-            )
-
-    def _should_index(self, file_path: str) -> bool:
-        """Check if file should be indexed based on supported extensions."""
-        # List of supported document extensions for auto-indexing
-        supported_extensions = [
-            ".pdf",  # PDF documents
-            ".txt",
-            ".md",
-            ".markdown",  # Text documents
-            ".csv",  # CSV files
-            ".json",  # JSON files
-            ".py",
-            ".js",
-            ".ts",  # Code files (Python, JavaScript, TypeScript)
-            ".java",
-            ".cpp",
-            ".c",  # More code files
-            ".html",
-            ".css",  # Web files
-            ".yaml",
-            ".yml",  # Config files
-            ".xml",  # XML files
-            ".rst",  # ReStructuredText
-            ".log",  # Log files
-        ]
-        file_lower = file_path.lower()
-        return any(file_lower.endswith(ext) for ext in supported_extensions)
-
-    def _schedule_reindex(self, file_path: str):
-        """Schedule file for reindexing with debouncing and memory management."""
-        current_time = time.time()
-        last_time = self.last_indexed.get(file_path, 0)
-
-        if current_time - last_time > self.debounce_time:
-            self.last_indexed[file_path] = current_time
-            logger.info(f"Scheduling reindex for: {file_path}")
-            self.agent.reindex_file(file_path)
-
-            # Memory leak prevention: Limit cache size with LRU eviction
-            MAX_CACHE_SIZE = 1000
-            if len(self.last_indexed) > MAX_CACHE_SIZE:
-                # Remove oldest 10% of entries (LRU eviction)
-                num_to_remove = MAX_CACHE_SIZE // 10
-                sorted_items = sorted(self.last_indexed.items(), key=lambda x: x[1])
-                for path, _ in sorted_items[:num_to_remove]:
-                    del self.last_indexed[path]
-                logger.debug(
-                    f"Cleaned up {num_to_remove} old entries from debounce cache"
-                )
-
-    def _handle_deletion(self, file_path: str):
-        """Handle file deletion by removing it from the index."""
-        try:
-            file_abs_path = str(Path(file_path).absolute())
-            if file_abs_path in self.agent.indexed_files:
-                logger.info(f"File deleted, removing from index: {file_path}")
-                if self.agent.rag.remove_document(file_abs_path):
-                    self.agent.indexed_files.discard(file_abs_path)
-                    logger.info(
-                        f"Successfully removed deleted file from index: {file_path}"
-                    )
-                else:
-                    logger.warning(
-                        f"Failed to remove deleted file from index: {file_path}"
-                    )
-            # Clean up from last_indexed tracker if present
-            if file_path in self.last_indexed:
-                del self.last_indexed[file_path]
-        except Exception as e:
-            logger.error(f"Error handling file deletion {file_path}: {e}")
-
-    def _update_telemetry(
-        self, event_type: str, file_path: str
-    ):  # pylint: disable=unused-argument
-        """Update telemetry statistics for file events."""
-        self.telemetry[event_type] += 1
-        self.telemetry["total_events"] += 1
-        self.telemetry["last_event_time"] = time.time()
-
-        # Log telemetry every 10 events or significant events
-        if self.telemetry["total_events"] % 10 == 0 or event_type in [
-            "files_deleted",
-            "files_moved",
-        ]:
-            logger.info(
-                f"📊 File Watch Telemetry: "
-                f"Added: {self.telemetry['files_added']}, "
-                f"Modified: {self.telemetry['files_modified']}, "
-                f"Deleted: {self.telemetry['files_deleted']}, "
-                f"Moved: {self.telemetry['files_moved']}, "
-                f"Total: {self.telemetry['total_events']}"
-            )
-
-    def get_telemetry(self) -> Dict[str, Any]:
-        """Get current telemetry statistics."""
-        return self.telemetry.copy()
 
 
 class ChatAgent(
@@ -819,7 +670,7 @@ When user asks to "index my data folder" or similar:
 
     def _watch_directory(self, directory: str) -> None:
         """Watch a directory for file changes."""
-        if Observer is None:
+        if not check_watchdog_available():
             error_msg = (
                 "\n❌ Error: Missing required package 'watchdog'\n\n"
                 "File watching requires the watchdog package.\n"
@@ -832,7 +683,13 @@ When user asks to "index my data folder" or similar:
             raise ImportError(error_msg)
 
         try:
-            event_handler = FileChangeHandler(self)
+            # Use generic FileChangeHandler with callbacks
+            event_handler = FileChangeHandler(
+                on_created=self.reindex_file,
+                on_modified=self.reindex_file,
+                on_deleted=self._handle_file_deletion,
+                on_moved=self._handle_file_move,
+            )
             observer = Observer()
             observer.schedule(event_handler, directory, recursive=True)
             observer.start()
@@ -840,6 +697,32 @@ When user asks to "index my data folder" or similar:
             logger.info(f"Started watching: {directory}")
         except Exception as e:
             logger.error(f"Failed to watch {directory}: {e}")
+
+    def _handle_file_deletion(self, file_path: str) -> None:
+        """Handle file deletion by removing it from the index."""
+        if not self.rag:
+            return
+
+        try:
+            file_abs_path = str(Path(file_path).absolute())
+            if file_abs_path in self.indexed_files:
+                logger.info(f"File deleted, removing from index: {file_path}")
+                if self.rag.remove_document(file_abs_path):
+                    self.indexed_files.discard(file_abs_path)
+                    logger.info(
+                        f"Successfully removed deleted file from index: {file_path}"
+                    )
+                else:
+                    logger.warning(
+                        f"Failed to remove deleted file from index: {file_path}"
+                    )
+        except Exception as e:
+            logger.error(f"Error handling file deletion {file_path}: {e}")
+
+    def _handle_file_move(self, src_path: str, dest_path: str) -> None:
+        """Handle file move by removing old path and indexing new path."""
+        self._handle_file_deletion(src_path)
+        self.reindex_file(dest_path)
 
     def reindex_file(self, file_path: str) -> None:
         """Reindex a file that was modified or created."""

@@ -68,6 +68,12 @@
                 ]
               },
               {
+                "group": "Utilities",
+                "pages": [
+                  "sdk/utils/file-watcher"
+                ]
+              },
+              {
                 "group": "Agents",
                 "pages": [
                   "sdk/agents/talk",

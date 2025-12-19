@@ -8,11 +8,15 @@ AMD's framework for running generative AI applications locally on AMD hardware.
 
 from gaia.agents.base import Agent, MCPAgent, tool  # noqa: F401
 from gaia.database import DatabaseAgent, DatabaseMixin  # noqa: F401
+from gaia.utils import FileChangeHandler, FileWatcher, FileWatcherMixin  # noqa: F401
 
 __all__ = [
     "Agent",
     "DatabaseAgent",
     "DatabaseMixin",
+    "FileChangeHandler",
+    "FileWatcher",
+    "FileWatcherMixin",
     "MCPAgent",
     "tool",
 ]

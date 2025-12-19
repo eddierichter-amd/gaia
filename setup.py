@@ -29,6 +29,8 @@ setup(
         "gaia.chat",
         "gaia.database",
         "gaia.talk",
+        "gaia.testing",
+        "gaia.utils",
         "gaia.apps",
         "gaia.apps.llm",
         "gaia.apps.summarize",
