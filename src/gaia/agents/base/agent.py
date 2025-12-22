@@ -1239,11 +1239,6 @@ You must respond ONLY in valid JSON. No text before { or after }.
                         tool_name, tool_result, conversation, tool_args
                     )
 
-                    # Add tool result to messages array so LLM can see it in next turn
-                    # Format as user message for proper chat flow (user → assistant → user → assistant)
-                    tool_result_content = f"Tool result: {json.dumps(truncated_result) if isinstance(truncated_result, dict) else truncated_result}"
-                    messages.append({"role": "user", "content": tool_result_content})
-
                     # Display the tool result in real-time (show full result to user)
                     self.console.print_tool_complete()
 
