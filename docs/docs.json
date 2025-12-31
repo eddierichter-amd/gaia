@@ -139,6 +139,14 @@
                   "playbooks/emr-agent/part-2-dashboard",
                   "playbooks/emr-agent/part-3-architecture"
                 ]
+              },
+              {
+                "group": "Code Generation Agent",
+                "pages": [
+                  "playbooks/code-agent/part-1-introduction",
+                  "playbooks/code-agent/part-2-app-creation",
+                  "playbooks/code-agent/part-3-validation-building"
+                ]
               }
             ]
           }
